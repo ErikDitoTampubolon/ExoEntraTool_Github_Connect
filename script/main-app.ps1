@@ -1,3 +1,9 @@
+# =========================================================================
+# AUTHOR   : Erik Dito Tampubolon - TelkomSigma
+# VERSION  : 1.1
+# DESKRIPSI: Skrip Utama dengan ASCII Art Header "ExoEntraTool"
+# =========================================================================
+
 # ==========================================================================
 # INFRASTRUCTURE & REPOSITORY SYNC SYSTEM
 # AUTHOR: Erik Dito Tampubolon
@@ -63,6 +69,70 @@ Sync-GitHubRepo -RepoPath "script/entra" -GitHubUrl $repoEntra
 
 Write-Host "`n--- Infrastruktur Siap. Melanjutkan ke Logika Utama ---" -ForegroundColor Blue
 
+# --- PEMERIKSAAN INTEGRITAS FILE ---
+function Test-ScriptIntegrity {
+    Write-Host "--- Memeriksa Integritas File Aplikasi ---" -ForegroundColor Blue
+    
+    # Daftar semua file yang harus ada
+    $requiredScripts = @(
+        "script\exchange_online\assign-or-remove-license-user-by-csv-final.ps1",
+        "script\exchange_online\check-license-name-and-quota-final.ps1",
+        "script\exchange_online\check-mailbox-storage-user-by-csv-final.ps1",
+        "script\exchange_online\export-active-users-final.ps1",
+        "script\exchange_online\export-alluser-userprincipalname-contact-final.ps1",
+        "script\exchange_online\check-lastpasswordchange-user-by-csv-final.ps1",
+        "script\exchange_online\export-alluser-userprincipalname-contact-by-csv-final.ps1",
+        "script\exchange_online\check-mailbox-storage-user-by-csv-final.ps1",
+        "script\exchange_online\check-lastlogon-user-by-csv-final.ps1",
+        "script\exchange_online\check-transport-rules-final.ps1",
+        "script\exchange_online\export-onedrive-user-by-csv-final.ps1",
+        "script\entra\enable-or-disable-mfa-user-by-csv-final.ps1",
+        "script\entra\force-password-change-alluser-by-csv-final.ps1",
+        "script\entra\export-alluser-mfa-final.ps1",
+        "script\entra\export-alldevice-final.ps1",
+        "script\entra\export-alluser-owned-device-final.ps1",
+        "script\entra\export-allapplication-final.ps1",
+        "script\entra\export-alldeleted-user-final.ps1",
+        "script\entra\export-alluser-inactive-30days-final.ps1",
+        "script\entra\export-list-alldevice-final.ps1",
+        "script\entra\check-conditional-access-policy-final.ps1",
+        "script\entra\check-user-auth-method-final.ps1",
+        "script\entra\check-permission-grant-policy-final.ps1",
+        "script\entra\check-entra-auth-policy-final.ps1",
+        "script\entra\check-entra-identity-provider-final.ps1"
+    )
+
+    $missingFiles = @()
+
+    foreach ($relPath in $requiredScripts) {
+        $fullPath = Join-Path $scriptDir $relPath
+        if (-not (Test-Path $fullPath)) {
+            $missingFiles += $relPath
+        }
+    }
+
+    if ($missingFiles.Count -gt 0) {
+        Write-Host "PERINGATAN: Terdapat $($missingFiles.Count) file skrip yang hilang!" -ForegroundColor Red
+        foreach ($file in $missingFiles) {
+            Write-Host " [!] Hilang: $file" -ForegroundColor Yellow
+        }
+        Write-Host "`nSilakan hubungi Team Modern Work - Telkomsigma untuk perbaikan file." -ForegroundColor Cyan
+        
+        $Host.UI.RawUI.FlushInputBuffer()
+        $choice = Read-Host "Apakah Anda ingin tetap menjalankan aplikasi dengan fitur terbatas? (Y/N)"
+        if ($choice.ToUpper() -ne 'Y') {
+            Write-Host "Aplikasi dihentikan. Sampai jumpa!" -ForegroundColor Red
+            exit
+        }
+    } else {
+        Write-Host "Integritas file terpenuhi. Semua skrip ditemukan.`n" -ForegroundColor Green
+    }
+}
+
+# Jalankan Health Check sebelum mulai
+Clear-Host
+Test-ScriptIntegrity
+
 # --- Memeriksa Lingkungan PowerShell ---
 Set-ExecutionPolicy RemoteSigned -Scope Process -Force -ErrorAction SilentlyContinue
 
@@ -104,30 +174,33 @@ try {
     exit 1
 }
 
-# KONEKSI ENTRA
+# 2.2 KONEKSI ENTRA
 Write-Host "Menghubungkan ke Microsoft Entra" -ForegroundColor Yellow
 try {
-    Connect-Entra -Scopes 'User.Read.All', 'UserAuthenticationMethod.Read.All' -ErrorAction Stop
+    Connect-Entra -scope 'User.Read.All', 'UserAuthenticationMethod.Read.All' -ErrorAction Stop
     Write-Host "Koneksi Microsoft Entra Berhasil." -ForegroundColor Green
 } catch {
     Write-Host "Peringatan: Gagal terkoneksi ke Entra." -ForegroundColor Yellow
 }
 
-# KONEKSI EXCHANGE ONLINE
+# 2.3 KONEKSI EXCHANGE ONLINE (WAJIB - DENGAN ERROR HANDLING LENGKAP)
 Write-Host "Menghubungkan ke Exchange Online" -ForegroundColor Yellow
+
+# Cek apakah sudah ada sesi Exchange Online
 $existingSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq "Microsoft.Exchange" }
 
 if (-not $existingSession) {
-    try {
-        Connect-ExchangeOnline -ShowProgress $true -ErrorAction Stop
-        Write-Host "Koneksi ke Exchange Online berhasil" -ForegroundColor Green
-    }
-    catch {
-        Write-Host "`nGagal terhubung ke Exchange Online!" -ForegroundColor Red
-        Write-Host "Detail Error: $($_.Exception.Message)" -ForegroundColor Yellow
-        exit 1
-    }
+try {
+# Connect dengan ShowProgress TRUE agar user tahu proses login berjalan
+Connect-ExchangeOnline -ShowProgress $true -ErrorAction Stop
+Write-Host "Koneksi ke Exchange Online berhasil" -ForegroundColor Green
 }
+catch {
+Write-Host "`nGagal terhubung ke Exchange Online!" -ForegroundColor Red
+Write-Host "Detail Error: $($_.Exception.Message)" -ForegroundColor Yellow
+
+exit 1
+}}
 
 Write-Host "`nSemua layanan terhubung. Memuat antarmuka..." -ForegroundColor Green
 Start-Sleep -Seconds 1
@@ -150,7 +223,7 @@ function Show-Header {
     Write-Host $ascii -ForegroundColor Cyan
     Write-Host "======================================================================" -ForegroundColor DarkCyan
     Write-Host " Author   : Erik Dito Tampubolon - TelkomSigma" -ForegroundColor White
-    Write-Host " Version  : 1.1 (ExoEntraTool Suite - Direct GitHub Mode)" -ForegroundColor White
+    Write-Host " Version  : 1.1 (ExoEntraTool Suite)" -ForegroundColor White
     Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkCyan
     Write-Host " Location : ${scriptDir}" -ForegroundColor Gray
     Write-Host " Time     : $(Get-Date -Format 'dd-MM-yyyy HH:mm:ss')" -ForegroundColor Gray  
@@ -159,7 +232,7 @@ function Show-Header {
 }
 
 ## -----------------------------------------------------------------------
-## LOGIKA EKSEKUSI LOOP (MENU TETAP SAMA)
+## LOGIKA EKSEKUSI LOOP
 ## -----------------------------------------------------------------------
 
 $mainRunning = $true
@@ -197,17 +270,17 @@ while ($mainRunning) {
                 
                 $subChoice = Read-Host "Pilih nomor menu"
                 if ($subChoice.ToUpper() -eq "B") { $subRunning = $false }
-                elseif ($subChoice -eq "1") { Invoke-GitHubScript -RelativePath "script/exchange_online/assign-or-remove-license-user-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "2") { Invoke-GitHubScript -RelativePath "script/exchange_online/check-license-name-and-quota-final.ps1"; Pause }
-                elseif ($subChoice -eq "3") { Invoke-GitHubScript -RelativePath "script/exchange_online/export-mailbox-final.ps1"; Pause }
-                elseif ($subChoice -eq "4") { Invoke-GitHubScript -RelativePath "script/exchange_online/export-active-users-final.ps1"; Pause }
-                elseif ($subChoice -eq "5") { Invoke-GitHubScript -RelativePath "script/exchange_online/export-alluser-userprincipalname-contact-final.ps1"; Pause }
-                elseif ($subChoice -eq "6") { Invoke-GitHubScript -RelativePath "script/exchange_online/check-lastpasswordchange-user-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "7") { Invoke-GitHubScript -RelativePath "script/exchange_online/export-alluser-userprincipalname-contact-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "8") { Invoke-GitHubScript -RelativePath "script/exchange_online/check-mailbox-storage-user-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "9") { Invoke-GitHubScript -RelativePath "script/exchange_online/check-lastlogon-user-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "10") { Invoke-GitHubScript -RelativePath "script/exchange_online/check-transport-rules-final.ps1"; Pause }
-                elseif ($subChoice -eq "11") { Invoke-GitHubScript -RelativePath "script/exchange_online/export-onedrive-user-by-csv-final.ps1"; Pause }
+                elseif ($subChoice -eq "1") { & (Join-Path $scriptDir "script\exchange_online\assign-or-remove-license-user-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "2") { & (Join-Path $scriptDir "script\exchange_online\check-license-name-and-quota-final.ps1"); Pause }
+                elseif ($subChoice -eq "3") { & (Join-Path $scriptDir "script\exchange_online\export-mailbox-final.ps1"); Pause }
+                elseif ($subChoice -eq "4") { & (Join-Path $scriptDir "script\exchange_online\export-active-users-final.ps1"); Pause }
+                elseif ($subChoice -eq "5") { & (Join-Path $scriptDir "script\exchange_online\export-alluser-userprincipalname-contact-final.ps1"); Pause }
+                elseif ($subChoice -eq "6") { & (Join-Path $scriptDir "script\exchange_online\check-lastpasswordchange-user-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "7") { & (Join-Path $scriptDir "script\exchange_online\export-alluser-userprincipalname-contact-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "8") { & (Join-Path $scriptDir "script\exchange_online\check-mailbox-storage-user-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "9") { & (Join-Path $scriptDir "script\exchange_online\check-lastlogon-user-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "10") { & (Join-Path $scriptDir "script\exchange_online\check-transport-rules-final.ps1"); Pause }
+                elseif ($subChoice -eq "11") { & (Join-Path $scriptDir "script\exchange_online\export-onedrive-user-by-csv-final.ps1"); Pause }
             }
         }
         "2" { 
@@ -238,23 +311,23 @@ while ($mainRunning) {
                 
                 $subChoice = Read-Host "Pilih nomor menu"
                 if ($subChoice.ToUpper() -eq "B") { $subRunning = $false }
-                elseif ($subChoice -eq "1") { Invoke-GitHubScript -RelativePath "script/entra/enable-or-disable-mfa-user-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "2") { Invoke-GitHubScript -RelativePath "script/entra/force-password-change-alluser-by-csv-final.ps1"; Pause }
-                elseif ($subChoice -eq "3") { Invoke-GitHubScript -RelativePath "script/entra/export-alluser-mfa-final.ps1"; Pause }
-                elseif ($subChoice -eq "4") { Invoke-GitHubScript -RelativePath "script/entra/export-alldevice-final.ps1"; Pause }
-                elseif ($subChoice -eq "5") { Invoke-GitHubScript -RelativePath "script/entra/export-alluser-owned-device-final.ps1"; Pause }
-                elseif ($subChoice -eq "6") { Invoke-GitHubScript -RelativePath "script/entra/export-allapplication-final.ps1"; Pause }
-                elseif ($subChoice -eq "7") { Invoke-GitHubScript -RelativePath "script/entra/export-alldeleted-user-final.ps1"; Pause }
-                elseif ($subChoice -eq "8") { Invoke-GitHubScript -RelativePath "script/entra/export-alluser-inactive-30days-final.ps1"; Pause }
-                elseif ($subChoice -eq "9") { Invoke-GitHubScript -RelativePath "script/entra/export-list-alldevice-final.ps1"; Pause }
-                elseif ($subChoice -eq "10") { Invoke-GitHubScript -RelativePath "script/entra/check-conditional-access-policy-final.ps1"; Pause }
-                elseif ($subChoice -eq "11") { Invoke-GitHubScript -RelativePath "script/entra/check-user-auth-method-final.ps1"; Pause }
-                elseif ($subChoice -eq "12") { Invoke-GitHubScript -RelativePath "script/entra/check-permission-grant-policy-final.ps1"; Pause }
-                elseif ($subChoice -eq "13") { Invoke-GitHubScript -RelativePath "script/entra/check-entra-auth-policy-final.ps1"; Pause }
-                elseif ($subChoice -eq "14") { Invoke-GitHubScript -RelativePath "script/entra/check-entra-identity-provider-final.ps1"; Pause }
-                elseif ($subChoice -eq "15") { Invoke-GitHubScript -RelativePath "script/entra/export-allgroup-final.ps1"; Pause }
-                elseif ($subChoice -eq "16") { Invoke-GitHubScript -RelativePath "script/entra/export-domain-final.ps1"; Pause }
-                elseif ($subChoice -eq "17") { Invoke-GitHubScript -RelativePath "script/entra/export-mailtraffic-atp-report-final.ps1"; Pause }
+                elseif ($subChoice -eq "1") { & (Join-Path $scriptDir "script\entra\enable-or-disable-mfa-user-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "2") { & (Join-Path $scriptDir "script\entra\force-password-change-alluser-by-csv-final.ps1"); Pause }
+                elseif ($subChoice -eq "3") { & (Join-Path $scriptDir "script\entra\export-alluser-mfa-final.ps1"); Pause }
+                elseif ($subChoice -eq "4") { & (Join-Path $scriptDir "script\entra\export-alldevice-final.ps1"); Pause }
+                elseif ($subChoice -eq "5") { & (Join-Path $scriptDir "script\entra\export-alluser-owned-device-final.ps1"); Pause }
+                elseif ($subChoice -eq "6") { & (Join-Path $scriptDir "script\entra\export-allapplication-final.ps1"); Pause }
+                elseif ($subChoice -eq "7") { & (Join-Path $scriptDir "script\entra\export-alldeleted-user-final.ps1"); Pause }
+                elseif ($subChoice -eq "8") { & (Join-Path $scriptDir "script\entra\export-alluser-inactive-30days-final.ps1"); Pause }
+                elseif ($subChoice -eq "9") { & (Join-Path $scriptDir "script\entra\export-list-alldevice-final.ps1"); Pause }
+                elseif ($subChoice -eq "10") { & (Join-Path $scriptDir "script\entra\check-conditional-access-policy-final.ps1"); Pause }
+                elseif ($subChoice -eq "11") { & (Join-Path $scriptDir "script\entra\check-user-auth-method-final.ps1"); Pause }
+                elseif ($subChoice -eq "12") { & (Join-Path $scriptDir "script\entra\check-permission-grant-policy-final.ps1"); Pause }
+                elseif ($subChoice -eq "13") { & (Join-Path $scriptDir "script\entra\check-entra-auth-policy-final.ps1"); Pause }
+                elseif ($subChoice -eq "14") { & (Join-Path $scriptDir "script\entra\check-entra-identity-provider-final.ps1"); Pause }
+                elseif ($subChoice -eq "15") { & (Join-Path $scriptDir "script\entra\export-allgroup-final.ps1"); Pause }
+                elseif ($subChoice -eq "16") { & (Join-Path $scriptDir "script\entra\export-domain-final.ps1"); Pause }
+                elseif ($subChoice -eq "17") { & (Join-Path $scriptDir "script\entra\export-mailtraffic-atp-report-final.ps1"); Pause }
             }
         }
         "10" {

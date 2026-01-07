@@ -31,7 +31,7 @@ $csvFiles = Get-ChildItem -Path $parentDir -Filter "*.csv"
 if ($csvFiles.Count -eq 0) {
     Write-Host "Tidak ditemukan file CSV di direktori: $parentDir" -ForegroundColor Yellow
     
-    $newFileName = "daftar.email.csv"
+    $newFileName = "daftar_email.csv"
     $newFilePath = Join-Path -Path $parentDir -ChildPath $newFileName
     
     Write-Host "Membuat file CSV baru: $newFileName" -ForegroundColor Cyan
