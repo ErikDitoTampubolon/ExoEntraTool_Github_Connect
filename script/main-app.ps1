@@ -150,7 +150,7 @@ function Get-AndExecute {
 
     # Jika file belum ada, download dari GitHub Raw
     if (-not (Test-Path $localPath)) {
-        Write-Host "`n[!] Fitur belum tersedia lokal. Mendownload dari GitHub..." -ForegroundColor Cyan
+        Write-Host "`n[!] Download Script." -ForegroundColor Cyan
         try {
             # Pastikan folder tujuan ada
             $destFolder = Split-Path $localPath
