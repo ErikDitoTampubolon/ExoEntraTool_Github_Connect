@@ -8,86 +8,14 @@ $scriptName = "OneDriveUsageReport"
 $scriptOutput = @() 
 
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-$parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 
-# ==========================================================================
-#                    DETEKSI DAN PEMILIHAN FILE CSV
-# ==========================================================================
+# --- TAMBAHKAN BARIS INI UNTUK MEMPERBAIKI ERROR ---
+$outputFileName = "Output_$($scriptName)_$($timestamp).csv"
+# ----------------------------------------------------
 
-Write-Host "`n--- Mencari file CSV di: $parentDir ---" -ForegroundColor Blue
-
-# Mencari semua file .csv di folder 2 tingkat di atas script
-$csvFiles = Get-ChildItem -Path $parentDir -Filter "*.csv"
-
-if ($csvFiles.Count -eq 0) {
-    Write-Host "Tidak ditemukan file CSV di direktori: $parentDir" -ForegroundColor Yellow
-    
-    $newFileName = "daftar_email.csv"
-    $newFilePath = Join-Path -Path $parentDir -ChildPath $newFileName
-    
-    Write-Host "Membuat file CSV baru: $newFileName" -ForegroundColor Cyan
-    $null | Out-File -FilePath $newFilePath -Encoding utf8
-    
-    Write-Host "File berhasil dibuat." -ForegroundColor Green
-    
-    # ALERT MESSAGE: Memastikan pengguna mengisi file sebelum lanjut
-    Write-Host "`n==========================================================" -ForegroundColor Yellow
-    $checkFill = Read-Host "Apakah Anda sudah mengisi daftar email di file $newFileName? (Y/N)"
-    Write-Host "==========================================================" -ForegroundColor Yellow
-
-    if ($checkFill -ne "Y") {
-        Write-Host "`nSilakan isi file CSV terlebih dahulu, lalu jalankan ulang skrip." -ForegroundColor Red
-        # Membuka file secara otomatis agar pengguna bisa langsung mengisi
-        Start-Process notepad.exe $newFilePath
-        return
-    }
-
-    $inputFilePath = $newFilePath
-    $inputFileName = $newFileName
-}
-else {
-    Write-Host "File CSV yang ditemukan:" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $csvFiles.Count; $i++) {
-        Write-Host "$($i + 1). $($csvFiles[$i].Name)" -ForegroundColor Cyan
-    }
-
-    $fileChoice = Read-Host "`nPilih nomor file CSV yang ingin digunakan"
-
-    if (-not ($fileChoice -as [int]) -or [int]$fileChoice -lt 1 -or [int]$fileChoice -gt $csvFiles.Count) {
-        Write-Host "Pilihan tidak valid. Skrip dibatalkan." -ForegroundColor Red
-        return
-    }
-
-    $selectedFile = $csvFiles[[int]$fileChoice - 1]
-    $inputFilePath = $selectedFile.FullName
-    $inputFileName = $selectedFile.Name
-}
-
-# --- LOGIKA HITUNG TOTAL EMAIL ---
-try {
-    # Ambil data untuk verifikasi isi
-    $tempData = Import-Csv -Path $inputFilePath -Header "TempColumn" -ErrorAction SilentlyContinue
-    $totalEmail = if ($tempData) { $tempData.Count } else { 0 }
-    
-    Write-Host "`nFile Terpilih: $inputFileName" -ForegroundColor Green
-    Write-Host "Total email yang terdeteksi: $totalEmail email" -ForegroundColor Cyan
-
-    # Proteksi Tambahan: Jika file terdeteksi masih 0 baris setelah konfirmasi Y
-    if ($totalEmail -eq 0) {
-        Write-Host "`nPERINGATAN: File $inputFileName terdeteksi masih KOSONG." -ForegroundColor Red
-        $reconfirm = Read-Host "Apakah Anda yakin ingin tetap melanjutkan? (Y/N)"
-        if ($reconfirm -ne "Y") { 
-            Write-Host "Eksekusi dibatalkan. Silakan isi data terlebih dahulu." -ForegroundColor Yellow
-            return 
-        }
-    }
-    Write-Host "----------------------------------------------------------"
-} catch {
-    Write-Host "Gagal membaca file CSV: $($_.Exception.Message)" -ForegroundColor Red
-    return
-}
+# Definisi parentDir (2 tingkat di atas)
+$parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
 
 ## ==========================================================================
 #                           INFORMASI SCRIPT                
@@ -133,7 +61,7 @@ if ($confirmation -ne "Y") {
 ##                       KONEKSI KE MICROSOFT GRAPH
 ## ==========================================================================
 
-Write-Host "`n--- 2. Membangun Koneksi ke Layanan Microsoft ---" -ForegroundColor Blue
+Write-Host "`n--- Membangun Koneksi ke Layanan Microsoft ---" -ForegroundColor Blue
 
 # 2.1 Microsoft Graph
 try {
@@ -160,7 +88,7 @@ if (-not (Get-PSSession | Where-Object {$_.ConfigurationName -eq "Microsoft.Exch
 ##                           LOGIKA UTAMA SCRIPT
 ## ==========================================================================
 
-Write-Host "`n--- 3. Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
+Write-Host "`n--- Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
 
 try {
     # 2.1 Bypass Concealment (Penting agar UPN tidak berupa ID acak)
@@ -227,23 +155,17 @@ try {
 ## ==========================================================================
 
 if ($scriptOutput.Count -gt 0) {
+    # Memastikan folder penampung ada di 2 tingkat di atas skrip
     $exportFolderName = "exported_data"
-    $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
     $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
-
-    if (-not (Test-Path -Path $exportFolderPath)) {
-        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null
-        Write-Host "`nFolder '$exportFolderName' berhasil dibuat." -ForegroundColor Yellow
+    
+    if (-not (Test-Path -Path $exportFolderPath)) { 
+        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null 
     }
 
-    $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
+    # Menggunakan $outputFileName yang sudah didefinisikan di atas
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-
-    # Ekspor menggunakan pemisah titik koma sesuai framework
-    $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
     
-    Write-Host "`nSemua proses selesai!" -ForegroundColor Green
-    Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
-} else {
-    Write-Host "Tidak ada data yang diproses untuk diekspor." -ForegroundColor Yellow
+    $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
+    Write-Host "`nLaporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
 }

@@ -38,8 +38,8 @@ $validInput = $false
 # Loop hingga input valid (1 atau 2)
 while (-not $validInput) {
     Write-Host "`n--- Metode Input Data ---" -ForegroundColor Blue
-    Write-Host "1. Gunakan Daftar Email dari File CSV"
-    Write-Host "2. Proses Seluruh Pengguna (All Users) di Tenant"
+    Write-Host "1. Gunakan Daftar Email dari File CSV" -ForegroundColor Cyan
+    Write-Host "2. Proses Seluruh Pengguna (All Users) di Tenant" -ForegroundColor Cyan
     $inputMethod = Read-Host "`nPilih metode (1/2)"
 
     if ($inputMethod -eq "1") {
@@ -141,7 +141,6 @@ if ($useAllUsers) {
 # --- VALIDASI KETAT DATA KOSONG ---
 if ($null -eq $usersToProcess -or $usersToProcess.Count -eq 0) {
     Write-Host " ERROR: DATA TIDAK DITEMUKAN " -ForegroundColor White -BackgroundColor Red
-    
     if ($useAllUsers) {
         Write-Host "Penyebab: Tidak ada objek pengguna terdeteksi di Tenant ini." -ForegroundColor Yellow
     } else {
@@ -206,16 +205,11 @@ foreach ($entry in $usersToProcess) {
 if ($scriptOutput.Count -gt 0) {
     $exportFolderName = "exported_data"
     $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
-
-    if (-not (Test-Path -Path $exportFolderPath)) {
-        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null
-    }
+    if (-not (Test-Path -Path $exportFolderPath)) { New-Item -Path $exportFolderPath -ItemType Directory | Out-Null }
 
     $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
     
     $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
-    
-    Write-Host "`nSemua proses selesai!" -ForegroundColor Green
-    Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
+    Write-Host "`nLaporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
 }

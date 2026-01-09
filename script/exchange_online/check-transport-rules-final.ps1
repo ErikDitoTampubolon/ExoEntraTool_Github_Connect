@@ -48,17 +48,16 @@ if ($confirmation -ne "Y") {
 ##                          LOGIKA UTAMA SCRIPT
 ## ==========================================================================
 
-Write-Host "`n--- 3. Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
-Write-Host "PENTING: Pastikan Anda telah menjalankan Connect-ExchangeOnline secara manual sebelum melanjutkan." -ForegroundColor Red
+Write-Host "`n--- Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
 
 try {
-    Write-Host "3.1. Mengambil semua Mail Flow Rules..." -ForegroundColor Cyan
+    Write-Host "Mengambil semua Mail Flow Rules" -ForegroundColor Cyan
     
     # Ambil semua Mail Flow Rules. Pilih properti yang relevan.
     $rules = Get-TransportRule | Select-Object Name, State, Priority, *Conditions, *Actions, Description, WhenCreated, WhenChanged, SenderRestrictions
 
     $totalRules = $rules.Count
-    Write-Host "Ditemukan $($totalRules) Aturan Transport." -ForegroundColor Green
+    Write-Host "Ditemukan $($totalRules) Transport Rules." -ForegroundColor Green
     
     $i = 0
     foreach ($rule in $rules) {

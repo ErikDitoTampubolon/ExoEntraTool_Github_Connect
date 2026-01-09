@@ -218,34 +218,32 @@ while ($mainRunning) {
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User by .csv"
+                Write-Host "  1. Assign or Remove License User"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
-                Write-Host "  5. Export List All Active User (DisplayName,UPN,Contact)"
-                Write-Host "  6. Export List Active User Last Password Changes by .csv"
-                Write-Host "  7. Export List Active User (DisplayName,UPN,Contact) by .csv"
-                Write-Host "  8. Export List Mailbox Storage Usage by .csv"
-                Write-Host "  9. Export List Active User Last Logon by .csv"
-                Write-Host "  10. Export List Transport Rules"
-                Write-Host "  11. Export List OneDrive Usage"
+                Write-Host "  5. Export List Active User (DisplayName,UPN,Contact)"
+                Write-Host "  6. Export List Active User Last Password Changes"
+                Write-Host "  7. Export List Mailbox Storage Usage"
+                Write-Host "  8. Export List Mailbox Last Logon"
+                Write-Host "  9. Export List Transport Rules"
+                Write-Host "  10. Export List OneDrive Usage"
                 Write-Host ""
                 Write-Host "  B. Kembali ke Menu Utama" -ForegroundColor Yellow
                 Write-Host "---------------------------------------------" -ForegroundColor DarkCyan
                 
                 $subChoice = Read-Host "Pilih nomor menu"
                 if ($subChoice.ToUpper() -eq "B") { $subRunning = $false }
-                elseif ($subChoice -eq "1") { Get-AndExecute -SubFolder "exchange_online" -FileName "assign-or-remove-license-user-by-csv-final.ps1" }
+                elseif ($subChoice -eq "1") { Get-AndExecute -SubFolder "exchange_online" -FileName "assign-or-remove-license-user-final.ps1" }
                 elseif ($subChoice -eq "2") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-license-name-and-quota-final.ps1" }
                 elseif ($subChoice -eq "3") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-mailbox-final.ps1" }
                 elseif ($subChoice -eq "4") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-active-users-final.ps1" }
                 elseif ($subChoice -eq "5") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-alluser-userprincipalname-contact-final.ps1" }
-                elseif ($subChoice -eq "6") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-lastpasswordchange-user-by-csv-final.ps1" }
-                elseif ($subChoice -eq "7") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-alluser-userprincipalname-contact-by-csv-final.ps1" }
-                elseif ($subChoice -eq "8") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-mailbox-storage-user-by-csv-final.ps1" }
-                elseif ($subChoice -eq "9") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-lastlogon-user-by-csv-final.ps1" }
-                elseif ($subChoice -eq "10") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-transport-rules-final.ps1" }
-                elseif ($subChoice -eq "11") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-user-by-csv-final.ps1" }
+                elseif ($subChoice -eq "6") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-lastpasswordchange-user-final.ps1" }
+                elseif ($subChoice -eq "7") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-mailbox-storage-user-final.ps1" }
+                elseif ($subChoice -eq "8") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-lastlogon-user-final.ps1" }
+                elseif ($subChoice -eq "9") { Get-AndExecute -SubFolder "exchange_online" -FileName "check-transport-rules-final.ps1" }
+                elseif ($subChoice -eq "10") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-user-final.ps1" }
             }
         }
         "2" { 

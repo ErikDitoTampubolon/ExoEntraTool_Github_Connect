@@ -24,8 +24,7 @@ Write-Host "`n================================================" -ForegroundColor
 Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Yellow
 Write-Host " Nama Skrip        : ExportLicenseQuotaReport" -ForegroundColor Yellow
-Write-Host " Field Kolom       : [LicenseName]
-                     [SkuPartNumber]
+Write-Host " Field Kolom       : [SkuPartNumber]
                      [CapabilityStatus]
                      [TotalUnits]
                      [ConsumedUnits]
@@ -50,7 +49,7 @@ if ($confirmation -ne "Y") {
 
 Write-Host "`n--- 3. Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
 
-Write-Host "3.1. Mengambil detail semua Lisensi yang Disubskripsikan (SKU)..." -ForegroundColor Cyan
+Write-Host "Mengambil detail semua Lisensi yang Disubskripsikan (SKU)..." -ForegroundColor Cyan
 
 try {
     # Ambil semua SKU yang disubskripsikan
@@ -74,7 +73,6 @@ try {
         
         # Bangun objek kustom untuk diekspor
         $scriptOutput += [PSCustomObject]@{
-            LicenseName = $sku.SkuName
             SkuPartNumber = $sku.SkuPartNumber
             CapabilityStatus = $sku.CapabilityStatus
             TotalUnits = $totalUnits
@@ -110,29 +108,16 @@ catch {
 ## ==========================================================================
 
 if ($scriptOutput.Count -gt 0) {
-    # 1. Tentukan nama folder
-    $exportFolderName = "exported_data"
-    
-    # 2. Ambil jalur dua tingkat di atas direktori skrip
-    # Contoh: Jika skrip di C:\Users\Erik\Project\Scripts, maka ini ke C:\Users\Erik\
-    $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-    
-    # 3. Gabungkan menjadi jalur folder ekspor
-    $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
+    $targetDir = (Get-Item $scriptDir).Parent.Parent.FullName
 
-    # 4. Cek apakah folder 'exported_data' sudah ada di lokasi tersebut, jika belum buat baru
-    if (-not (Test-Path -Path $exportFolderPath)) {
-        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null
-        Write-Host "`nFolder '$exportFolderName' berhasil dibuat di: $parentDir" -ForegroundColor Yellow
+    $exportFolderName = "exported_data"
+    $exportFolderPath = Join-Path -Path $targetDir -ChildPath $exportFolderName
+    
+    if (-not (Test-Path -Path $exportFolderPath)) { 
+        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null 
     }
 
-    # 5. Tentukan nama file dan jalur lengkap
-    $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-    
-    # 6. Ekspor data
     $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
-    
-    Write-Host "`nSemua proses selesai!" -ForegroundColor Green
-    Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
+    Write-Host "`nLaporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
 }

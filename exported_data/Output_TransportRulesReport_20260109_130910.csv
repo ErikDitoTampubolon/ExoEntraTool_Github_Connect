@@ -1,0 +1,42 @@
+﻿"RuleName";"State";"Priority";"WhenCreated";"WhenChanged";"SenderRestrictions";"Description";"AllConditions";"AllActions"
+"Moderation for Lidia Holloway";"Disabled";"0";;"11/26/2025 5:13:51 PM";;"If the message:
+	Is sent to 'Outside the organization'
+	and Is received from 'LidiaH@M365x57702712.OnMicrosoft.com'
+	and Includes these words in the message subject or body: 'takeover' or 'acquisition'
+Take the following actions:
+	Forward the message to the sender's manager for approval
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.SentToScopePredicate; Microsoft.Exchange.MessagingPolicies.Rules.Tasks.FromPredicate; Microsoft.Exchange.MessagingPolicies.Rules.Tasks.SubjectOrBodyContainsPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.ModerateMessageByManagerAction"
+"Signature for Lidia Holloway";"Disabled";"1";;"11/26/2025 5:14:09 PM";;"If the message:
+	Is received from 'LidiaH@M365x57702712.OnMicrosoft.com'
+Take the following actions:
+	Append the message with the disclaimer '<h3>%%DisplayName%%</h3><br>%%Title%%<br>%%Department%%<br>%%Email%%'. If the disclaimer can't be applied, attach the message to a new disclaimer message.
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.FromPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.ApplyHtmlDisclaimerAction"
+"Company Email Disclaimer";"Disabled";"2";;"11/26/2025 5:14:18 PM";;"If the message:
+	Is sent to 'Outside the organization'
+Take the following actions:
+	Append the message with the disclaimer '<body><br>&nbsp<br>&nbsp<br><b><font color=red>This e-mail and attachments are intended for the individual or group addressed.</font></b></body>'. If the disclaimer can't be applied, attach the message to a new disclaimer message.
+Except if the message:
+	Includes these words in the message subject: 'This e-mail and attachments are intended for the individual'
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.SentToScopePredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.ApplyHtmlDisclaimerAction"
+"Any attachment is greater than or equal to 500 KB";"Enabled";"3";;"12/8/2025 2:20:48 PM";;"If the message:
+	has an attachment that's larger than or equal to '500 KB (512,000 bytes)'
+Take the following actions:
+	reject the message and include the explanation 'Ukuran email yang ingin anda kirim besar nya lebih dari 500 kb, silahkan perkecil.' with the status code: '5.7.1'
+Except if the message:
+	Is received from 'erik.dito@M365x57702712.onmicrosoft.com'
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.AttachmentSizeOverPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.RejectMessageAction"
+"Attachment's file extension matches pdf and word";"Disabled";"4";;"12/8/2025 2:44:08 PM";;"If the message:
+	has an attachment with a file extension that matches one of these values: 'pdf' or 'docx' or 'doc'
+Take the following actions:
+	reject the message and include the explanation 'attachment's file extension matches 'pdf' and 'word'' with the status code: '5.7.1'
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.AttachmentExtensionMatchesWordsPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.RejectMessageAction"
+"The subject or body includes any of these words bitcoin or exc";"Disabled";"5";;"12/8/2025 2:44:34 PM";;"If the message:
+	Includes these words in the message subject or body: 'bitcoin' or 'exchange'
+Take the following actions:
+	reject the message and include the explanation 'The subject or body includes any of these words 'bitcoin' or 'exchange'.' with the status code: '5.7.1'
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.SubjectOrBodyContainsPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.RejectMessageAction"
+"Domain sigma gabole kekirim :P";"Disabled";"6";;"12/8/2025 2:44:52 PM";;"If the message:
+	sender's address domain portion belongs to any of these domains: 'sigma.co.id'
+Take the following actions:
+	reject the message and include the explanation 'domain sigma dilarang.' with the status code: '5.7.1'
+";"Conditions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.SenderDomainIsPredicate";"Actions : Microsoft.Exchange.MessagingPolicies.Rules.Tasks.RejectMessageAction"
