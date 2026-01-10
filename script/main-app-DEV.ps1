@@ -284,7 +284,7 @@ while ($mainRunning) {
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User Testing"
+                Write-Host "  1. Assign or Remove License User Testing 2"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
