@@ -232,6 +232,7 @@ while ($mainRunning) {
                 Write-Host "  12. Export List Full Access"
                 Write-Host "  13. Export List Group Mailbox"
                 Write-Host "  14. Export List OneDrive Shared Items"
+                Write-Host "  15. Export List OneDrive Folder and File"
                 Write-Host ""
                 Write-Host "  B. Kembali ke Menu Utama" -ForegroundColor Yellow
                 Write-Host "---------------------------------------------" -ForegroundColor DarkCyan
@@ -251,7 +252,8 @@ while ($mainRunning) {
                 elseif ($subChoice -eq "11") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-spam-email-final.ps1" }
                 elseif ($subChoice -eq "12") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-full-access-final.ps1" }
                 elseif ($subChoice -eq "13") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-group-mailbox-final.ps1" }
-                elseif ($subChoice -eq "14") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-shared-items.ps1" }
+                elseif ($subChoice -eq "14") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-shared-items-final.ps1" }
+                elseif ($subChoice -eq "15") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-folder-file-user.ps1" }
             }
         }
         "2" { 
