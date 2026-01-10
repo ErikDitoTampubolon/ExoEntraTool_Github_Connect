@@ -1,19 +1,16 @@
 # =========================================================================
-# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.6)
-# Nama Skrip: Bulk-EntraPasswordReset-AutoGenerate
-# Deskripsi: Reset password massal dengan password acak yang dibuat sistem.
+# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.0)
+# Menyimpan output skrip ke file CSV dinamis di folder skrip.
 # =========================================================================
 
-# 1. Konfigurasi File Input & Path
+# Variabel Global dan Output
+$scriptName = "OneDriveUsageReport" 
+$scriptOutput = @() 
+
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
 
-# Variabel Global dan Output
-$scriptName = "AutoPasswordResetReport" 
-$scriptOutput = [System.Collections.ArrayList]::new() 
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputFileName = "Output_$($scriptName)_$($timestamp).csv"
-$outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 
 # ==========================================================================
 #                    DETEKSI DAN PEMILIHAN FILE CSV
@@ -96,17 +93,30 @@ try {
 #                           INFORMASI SCRIPT                
 ## ==========================================================================
 
+# ==========================================================
+#                INFORMASI SCRIPT                
+# ==========================================================
 Write-Host "`n================================================" -ForegroundColor Yellow
 Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Yellow
-Write-Host " Nama Skrip        : Bulk-EntraPasswordReset-AutoGenerate" -ForegroundColor Yellow
-Write-Host " Field Kolom       : [Timestamp]
+Write-Host " Nama Skrip        : Get-OneDriveSizeReport.ps1" -ForegroundColor Yellow
+Write-Host " Field Kolom       : [Owner]
                      [UserPrincipalName]
-                     [TemporaryPassword]
-                     [Status]
-                     [Message]" -ForegroundColor Yellow
-Write-Host " Deskripsi Singkat : Script ini berfungsi untuk melakukan reset password massal pada pengguna Microsoft Entra ID dengan password acak yang digenerate otomatis oleh sistem. Password baru dicatat dalam laporan CSV bersama status eksekusi dan pesan hasil." -ForegroundColor Cyan
+                     [SiteId]
+                     [IsDeleted]
+                     [LastActivityDate]
+                     [FileCount]
+                     [ActiveFileCount]
+                     [QuotaGB]
+                     [UsedGB]
+                     [PercentUsed]
+                     [City]
+                     [Country]
+                     [Department]
+                     [JobTitle]" -ForegroundColor Yellow
+Write-Host " Deskripsi Singkat : Script ini berfungsi untuk mengekspor laporan penggunaan storage OneDrive for Business di Microsoft 365. Laporan mencakup informasi pemilik, UPN, detail site, status penghapusan, aktivitas terakhir, jumlah file, kuota, pemakaian storage, persentase penggunaan, serta atribut tambahan pengguna (lokasi, departemen, jabatan). Hasil laporan diekspor ke file CSV dan ditampilkan dalam GridView." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Yellow
+
 
 ## ==========================================================================
 #                           KONFIRMASI EKSEKUSI
@@ -120,112 +130,120 @@ if ($confirmation -ne "Y") {
 }
 
 ## ==========================================================================
-##                  FUNGSI GENERATOR PASSWORD & KONEKSI
+##                       KONEKSI KE MICROSOFT GRAPH
 ## ==========================================================================
 
-# Fungsi untuk membuat password acak 12 karakter yang aman
-function Generate-RandomPassword {
-    $length = 12
-    $chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
-    $randomPassword = ""
-    for ($i = 0; $i -lt $length; $i++) {
-        $randomPassword += $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-    }
-    return $randomPassword
-}
+Write-Host "`n--- 2. Membangun Koneksi ke Layanan Microsoft ---" -ForegroundColor Blue
 
-Write-Host "`n--- 2. Membangun Koneksi ke Microsoft Entra ---" -ForegroundColor Blue
-
+# 2.1 Microsoft Graph
 try {
-    Write-Host "Menghubungkan ke Microsoft Entra..." -ForegroundColor Yellow
-    Connect-Entra -Scopes 'User.ReadWrite.All' -ErrorAction Stop
-    Write-Host "Koneksi Berhasil." -ForegroundColor Green
+    $requiredScopes = "User.Read.All", "Reports.Read.All", "ReportSettings.ReadWrite.All"
+    Connect-MgGraph -NoWelcome -Scopes $requiredScopes -ErrorAction Stop
+    Write-Host "Koneksi ke Microsoft Graph berhasil." -ForegroundColor Green
 } catch {
-    Write-Error "Gagal terhubung: $($_.Exception.Message)"
+    Write-Error "Gagal terhubung ke Microsoft Graph: $($_.Exception.Message)"
     exit 1
 }
 
-## ==========================================================================
-##                          LOGIKA UTAMA SCRIPT
-## ==========================================================================
-
-Write-Host "`n--- 3. Memulai Proses Reset Password Otomatis ---" -ForegroundColor Magenta
-
-if (Test-Path $inputFilePath) {
-    # Import CSV (Asumsi: File hanya berisi daftar email tanpa header)
-    $users = Import-Csv $inputFilePath -Header "TempColumn" | Where-Object { $_.TempColumn -ne $null -and $_.TempColumn.Trim() -ne "" }
-    $totalUsers = $users.Count
-    $counter = 0
-
-    foreach ($user in $users) {
-        $counter++
-        $targetUser = $user.TempColumn.Trim()
-        
-        # Buat Password Baru secara acak untuk user ini
-        $autoGeneratedPassword = Generate-RandomPassword
-        
-        # Tampilan progres baris tunggal
-        $statusText = "-> [$counter/$totalUsers] Memproses: $targetUser . . ."
-        Write-Host "`r$statusText" -ForegroundColor Green -NoNewline
-
-        try {
-            # Eksekusi Reset Password
-            Set-EntraUser -UserId $targetUser -PasswordProfile @{
-                Password = $autoGeneratedPassword
-                ForceChangePasswordNextSignIn = $true
-            } -ErrorAction Stop
-
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = $autoGeneratedPassword # Simpan password di log CSV
-                Status            = "SUCCESS"
-                Message           = "Password auto-generated and reset"
-            }
-        } catch {
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = "-"
-                Status            = "FAILED"
-                Message           = $_.Exception.Message
-            }
-        }
-        [void]$scriptOutput.Add($res)
+# 2.2 Exchange Online (Wajib Framework)
+if (-not (Get-PSSession | Where-Object {$_.ConfigurationName -eq "Microsoft.Exchange"})) {
+    try {
+        Connect-ExchangeOnline -ShowProgress $false -ErrorAction Stop | Out-Null
+        Write-Host "Koneksi ke Exchange Online berhasil." -ForegroundColor Green
+    } catch {
+        Write-Error "Gagal terhubung ke Exchange Online: $($_.Exception.Message)"
+        exit 1
     }
-    Write-Host "`n`nPemrosesan Selesai." -ForegroundColor Green
-} else {
-    Write-Host "ERROR: File '$inputFileName' tidak ditemukan!" -ForegroundColor Red
 }
 
 ## ==========================================================================
-##                              EKSPOR HASIL
+##                           LOGIKA UTAMA SCRIPT
+## ==========================================================================
+
+Write-Host "`n--- 3. Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
+
+try {
+    # 2.1 Bypass Concealment (Penting agar UPN tidak berupa ID acak)
+    Update-MgAdminReportSetting -BodyParameter @{ displayConcealedNames = $false } -ErrorAction SilentlyContinue
+
+    # 2.2 Ambil Data User untuk Mapping City/Dept
+    Write-Host "Mengambil data detail akun user..." -ForegroundColor Cyan
+    $users = Get-MgUser -All -Property Id,displayName,userPrincipalName,city,department,jobTitle -ErrorAction SilentlyContinue
+    $UserHash = @{}
+    foreach ($u in $users) { $UserHash[$u.userPrincipalName] = $u }
+
+    # 2.3 Ambil Report OneDrive
+    $TempExportFile = Join-Path $scriptDir "temp_usage.csv"
+    Get-MgReportOneDriveUsageAccountDetail -Period D30 -Outfile $TempExportFile -ErrorAction Stop
+
+    if (Test-Path $TempExportFile) {
+        # URUTAN HEADER YANG BENAR UNTUK GRAPH REPORT:
+        # 1. Report Refresh Date, 2. Site URL, 3. Owner Display Name, 4. Is Deleted, 
+        # 5. Last Activity Date, 6. File Count, 7. Active File Count, 8. Storage Allocated (Byte), 
+        # 9. Storage Used (Byte), 10. Owner Principal Name
+        
+        $rawCSV = Import-CSV $TempExportFile
+        $totalItems = $rawCSV.Count
+        $currentIndex = 0
+
+        foreach ($row in $rawCSV) {
+            $currentIndex++
+            
+            # Mengambil properti langsung dari objek CSV (Graph SDK biasanya menyertakan header otomatis)
+            $targetUPN = $row.'Owner Principal name'
+            $usedByte  = if ($row.'Storage Used (Byte)') { [double]$row.'Storage Used (Byte)' } else { 0 }
+            $quotaByte = if ($row.'Storage Allocated (Byte)') { [double]$row.'Storage Allocated (Byte)' } else { 0 }
+            
+            $usedGB  = [Math]::Round($usedByte / 1GB, 2)
+            $quotaGB = [Math]::Round($quotaByte / 1GB, 2)
+
+            Write-Host ("-> [{0}/{1}] Memproses: {2} . . . Usage: {3} GB" -f $currentIndex, $totalItems, $targetUPN, $usedGB) -ForegroundColor White
+
+            $userData = $UserHash[$targetUPN]
+
+            $scriptOutput += [PSCustomObject]@{
+                ReportDate        = $row.'Report Refresh Date'
+                Owner             = $row.'Owner display name'
+                UserPrincipalName = $targetUPN
+                IsDeleted         = $row.'Is Deleted'
+                LastActivityDate  = $row.'Last Activity Date'
+                FileCount         = $row.'File Count'
+                QuotaGB           = $quotaGB
+                UsedGB            = $usedGB
+                City              = if ($userData.city) { $userData.city } else { "N/A" }
+                Department        = if ($userData.department) { $userData.department } else { "N/A" }
+                JobTitle          = if ($userData.jobTitle) { $userData.jobTitle } else { "N/A" }
+            }
+        }
+    }
+} catch {
+    Write-Host "Terjadi kesalahan: $($_.Exception.Message)" -ForegroundColor Red
+} finally {
+    if (Test-Path $TempExportFile) { Remove-Item $TempExportFile -Force }
+}
+
+## ==========================================================================
+##                               EKSPOR HASIL
 ## ==========================================================================
 
 if ($scriptOutput.Count -gt 0) {
-    # 1. Tentukan nama folder
     $exportFolderName = "exported_data"
-    
-    # 2. Ambil jalur dua tingkat di atas direktori skrip
-    # Contoh: Jika skrip di C:\Users\Erik\Project\Scripts, maka ini ke C:\Users\Erik\
     $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-    
-    # 3. Gabungkan menjadi jalur folder ekspor
     $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
 
-    # 4. Cek apakah folder 'exported_data' sudah ada di lokasi tersebut, jika belum buat baru
     if (-not (Test-Path -Path $exportFolderPath)) {
         New-Item -Path $exportFolderPath -ItemType Directory | Out-Null
-        Write-Host "`nFolder '$exportFolderName' berhasil dibuat di: $parentDir" -ForegroundColor Yellow
+        Write-Host "`nFolder '$exportFolderName' berhasil dibuat." -ForegroundColor Yellow
     }
 
-    # 5. Tentukan nama file dan jalur lengkap
     $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-    
-    # 6. Ekspor data
+
+    # Ekspor menggunakan pemisah titik koma sesuai framework
     $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
     
     Write-Host "`nSemua proses selesai!" -ForegroundColor Green
     Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
+} else {
+    Write-Host "Tidak ada data yang diproses untuk diekspor." -ForegroundColor Yellow
 }

@@ -1,18 +1,18 @@
 # =========================================================================
-# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.6)
-# Nama Skrip: Bulk-EntraPasswordReset-AutoGenerate
-# Deskripsi: Reset password massal dengan password acak yang dibuat sistem.
+# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.1 - No Header)
 # =========================================================================
 
-# 1. Konfigurasi File Input & Path
+# Variabel Global dan Output
+$scriptName = "MailboxLastLogonByCSVReport" 
+$scriptOutput = @() 
+
+# Penanganan Jalur Aman (Fix: Empty Path Error)
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
 
-# Variabel Global dan Output
-$scriptName = "AutoPasswordResetReport" 
-$scriptOutput = [System.Collections.ArrayList]::new() 
+# Tentukan jalur output
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputFileName = "Output_$($scriptName)_$($timestamp).csv"
+$outputFileName = "Output_${scriptName}_${timestamp}.csv"
 $outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 
 # ==========================================================================
@@ -92,25 +92,25 @@ try {
     return
 }
 
-## ==========================================================================
+# ==========================================================================
 #                           INFORMASI SCRIPT                
-## ==========================================================================
+# ==========================================================================
 
 Write-Host "`n================================================" -ForegroundColor Yellow
 Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Yellow
-Write-Host " Nama Skrip        : Bulk-EntraPasswordReset-AutoGenerate" -ForegroundColor Yellow
-Write-Host " Field Kolom       : [Timestamp]
-                     [UserPrincipalName]
-                     [TemporaryPassword]
+Write-Host " Nama Skrip        : MailboxLastLogonReport" -ForegroundColor Yellow
+Write-Host " Field Kolom       : [UserPrincipalName]
+                     [DisplayName]
+                     [LastLogonTime]
                      [Status]
-                     [Message]" -ForegroundColor Yellow
-Write-Host " Deskripsi Singkat : Script ini berfungsi untuk melakukan reset password massal pada pengguna Microsoft Entra ID dengan password acak yang digenerate otomatis oleh sistem. Password baru dicatat dalam laporan CSV bersama status eksekusi dan pesan hasil." -ForegroundColor Cyan
+                     [Reason]" -ForegroundColor Yellow
+Write-Host " Deskripsi Singkat : Script ini berfungsi untuk membuat laporan tanggal Last Logon kotak surat berdasarkan daftar email dari file CSV tanpa header, memvalidasi keberadaan mailbox, menampilkan progres eksekusi di konsol, serta mengekspor hasil ke file CSV." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Yellow
 
-## ==========================================================================
+# ==========================================================================
 #                           KONFIRMASI EKSEKUSI
-## ==========================================================================
+# ==========================================================================
 
 $confirmation = Read-Host "Apakah Anda ingin menjalankan skrip ini? (Y/N)"
 
@@ -120,82 +120,87 @@ if ($confirmation -ne "Y") {
 }
 
 ## ==========================================================================
-##                  FUNGSI GENERATOR PASSWORD & KONEKSI
-## ==========================================================================
-
-# Fungsi untuk membuat password acak 12 karakter yang aman
-function Generate-RandomPassword {
-    $length = 12
-    $chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
-    $randomPassword = ""
-    for ($i = 0; $i -lt $length; $i++) {
-        $randomPassword += $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-    }
-    return $randomPassword
-}
-
-Write-Host "`n--- 2. Membangun Koneksi ke Microsoft Entra ---" -ForegroundColor Blue
-
-try {
-    Write-Host "Menghubungkan ke Microsoft Entra..." -ForegroundColor Yellow
-    Connect-Entra -Scopes 'User.ReadWrite.All' -ErrorAction Stop
-    Write-Host "Koneksi Berhasil." -ForegroundColor Green
-} catch {
-    Write-Error "Gagal terhubung: $($_.Exception.Message)"
-    exit 1
-}
-
-## ==========================================================================
 ##                          LOGIKA UTAMA SCRIPT
 ## ==========================================================================
 
-Write-Host "`n--- 3. Memulai Proses Reset Password Otomatis ---" -ForegroundColor Magenta
+Write-Host "`n--- 3. Memulai Logika Utama Skrip: ${scriptName} ---" -ForegroundColor Magenta
 
-if (Test-Path $inputFilePath) {
-    # Import CSV (Asumsi: File hanya berisi daftar email tanpa header)
-    $users = Import-Csv $inputFilePath -Header "TempColumn" | Where-Object { $_.TempColumn -ne $null -and $_.TempColumn.Trim() -ne "" }
+if (-not (Test-Path -Path $inputFilePath)) {
+    Write-Error "File input CSV tidak ditemukan di: $inputFilePath"
+} else {
+    Write-Host "Memuat data dari '${inputFileName}' (Mode: No Header)..." -ForegroundColor Cyan
+    
+    # MODIFIKASI: Menggunakan -Header "UserPrincipalName" karena CSV tidak memiliki judul kolom
+    $users = Import-Csv -Path $inputFilePath -Header "UserPrincipalName" -ErrorAction SilentlyContinue
+    
     $totalUsers = $users.Count
-    $counter = 0
+    $userCount = 0
 
-    foreach ($user in $users) {
-        $counter++
-        $targetUser = $user.TempColumn.Trim()
-        
-        # Buat Password Baru secara acak untuk user ini
-        $autoGeneratedPassword = Generate-RandomPassword
-        
-        # Tampilan progres baris tunggal
-        $statusText = "-> [$counter/$totalUsers] Memproses: $targetUser . . ."
-        Write-Host "`r$statusText" -ForegroundColor Green -NoNewline
+    if ($totalUsers -eq 0) {
+        Write-Host "File CSV kosong." -ForegroundColor Yellow
+    }
+    
+    Write-Host "Total ${totalUsers} pengguna ditemukan." -ForegroundColor Yellow
 
+    foreach ($entry in $users) {
+        $userCount++
+        
+        # Trim email untuk membersihkan spasi yang mungkin ada
+        $upn = if ($entry.UserPrincipalName) { $entry.UserPrincipalName.Trim() } else { $null }
+        
+        # Skip jika baris kosong
+        if ([string]::IsNullOrWhiteSpace($upn)) { continue }
+
+        # FIX: Menggunakan ${} untuk menghindari error 'Variable reference is not valid'
+        Write-Progress -Activity "Generating Last Logon Report" `
+                       -Status "Processing User ${userCount} of ${totalUsers}: ${upn}" `
+                       -PercentComplete ([int](($userCount / $totalUsers) * 100))
+        
+        Write-Host "-> [${userCount}/${totalUsers}] Memproses: ${upn}..." -ForegroundColor White
+        
         try {
-            # Eksekusi Reset Password
-            Set-EntraUser -UserId $targetUser -PasswordProfile @{
-                Password = $autoGeneratedPassword
-                ForceChangePasswordNextSignIn = $true
-            } -ErrorAction Stop
+            # 3.2.1. Validasi Keberadaan Mailbox
+            $recipient = Get-Recipient -Identity $upn -ErrorAction Stop | Select-Object RecipientType, DisplayName
 
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = $autoGeneratedPassword # Simpan password di log CSV
-                Status            = "SUCCESS"
-                Message           = "Password auto-generated and reset"
+            if ($recipient.RecipientType -like "*UserMailbox*") {
+                
+                # 3.2.2. Ambil Statistik Mailbox (Output ditangkap agar tidak tumpah ke konsol)
+                $stats = Get-MailboxStatistics -Identity $upn -ErrorAction Stop | Select-Object LastLogonTime
+
+                $lastLogon = if ($stats.LastLogonTime) { 
+                    $stats.LastLogonTime.ToString("yyyy-MM-dd HH:mm:ss") 
+                } else { 
+                    "N/A (Never Logged On)" 
+                }
+                
+                $scriptOutput += [PSCustomObject]@{
+                    UserPrincipalName = $upn
+                    DisplayName       = $recipient.DisplayName
+                    LastLogonTime     = $lastLogon
+                    Status            = "SUCCESS"
+                    Reason            = "Last Logon Time retrieved."
+                }
+                Write-Host "Last Logon: ${lastLogon}" -ForegroundColor DarkGreen
+
+            } else {
+                $reason = "Recipient type is $($recipient.RecipientType) (Not a UserMailbox)."
+                Write-Host "Gagal: ${reason}" -ForegroundColor Yellow
+                $scriptOutput += [PSCustomObject]@{
+                    UserPrincipalName = $upn; DisplayName = $recipient.DisplayName; LastLogonTime = "N/A"; Status = "FAIL"; Reason = $reason
+                }
             }
-        } catch {
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = "-"
-                Status            = "FAILED"
-                Message           = $_.Exception.Message
+        } 
+        catch {
+            $errMsg = $_.Exception.Message
+            $reason = if ($errMsg -like "*cannot be found*") { "Mailbox not found." } else { "Error: $errMsg" }
+            
+            Write-Host "ERROR: ${reason}" -ForegroundColor Red
+            $scriptOutput += [PSCustomObject]@{
+                UserPrincipalName = $upn; DisplayName = ""; LastLogonTime = "N/A"; Status = "FAIL"; Reason = $reason
             }
         }
-        [void]$scriptOutput.Add($res)
     }
-    Write-Host "`n`nPemrosesan Selesai." -ForegroundColor Green
-} else {
-    Write-Host "ERROR: File '$inputFileName' tidak ditemukan!" -ForegroundColor Red
+    Write-Progress -Activity "Last Logon Report" -Completed
 }
 
 ## ==========================================================================
@@ -220,9 +225,9 @@ if ($scriptOutput.Count -gt 0) {
     }
 
     # 5. Tentukan nama file dan jalur lengkap
-    $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
+    $outputFileName = "Output_${scriptName}_${timestamp}.csv"
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-    
+
     # 6. Ekspor data
     $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
     

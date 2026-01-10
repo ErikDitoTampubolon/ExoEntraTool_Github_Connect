@@ -1,17 +1,21 @@
 # =========================================================================
-# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.6)
-# Nama Skrip: Bulk-EntraPasswordReset-AutoGenerate
-# Deskripsi: Reset password massal dengan password acak yang dibuat sistem.
+# AUTHOR: Erik Dito Tampubolon - TelkomSigma
+# VERSION: 2.9 (UI Enhanced Output)
+# Deskripsi: Fix ParserError & Support No Header CSV dengan Output Progres Hijau.
 # =========================================================================
 
-# 1. Konfigurasi File Input & Path
+# Variabel Global dan Output
+$scriptName = "AllActiveUsersDnUpnContactByCSVReport" 
+$scriptOutput = [System.Collections.ArrayList]::new() 
+$global:moduleStep = 1
+
+# Konfigurasi File Input]
+
+# Tentukan jalur dan nama file output dinamis
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
 
-# Variabel Global dan Output
-$scriptName = "AutoPasswordResetReport" 
-$scriptOutput = [System.Collections.ArrayList]::new() 
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
 $outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 
@@ -92,24 +96,23 @@ try {
     return
 }
 
-## ==========================================================================
-#                           INFORMASI SCRIPT                
-## ==========================================================================
+# ==========================================================================
+#                            INFORMASI SCRIPT                
+# ==========================================================================
 
 Write-Host "`n================================================" -ForegroundColor Yellow
 Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow
 Write-Host "================================================" -ForegroundColor Yellow
-Write-Host " Nama Skrip        : Bulk-EntraPasswordReset-AutoGenerate" -ForegroundColor Yellow
-Write-Host " Field Kolom       : [Timestamp]
-                     [UserPrincipalName]
-                     [TemporaryPassword]
-                     [Status]
-                     [Message]" -ForegroundColor Yellow
-Write-Host " Deskripsi Singkat : Script ini berfungsi untuk melakukan reset password massal pada pengguna Microsoft Entra ID dengan password acak yang digenerate otomatis oleh sistem. Password baru dicatat dalam laporan CSV bersama status eksekusi dan pesan hasil." -ForegroundColor Cyan
+Write-Host " Nama Skrip        : UserContactReport_Final_Fixed" -ForegroundColor Yellow
+Write-Host " Field Kolom       : [InputUser]
+                     [DisplayName]
+                     [UPN]
+                     [Contact]" -ForegroundColor Yellow
+Write-Host " Deskripsi Singkat : Script ini berfungsi untuk membuat laporan kontak pengguna Microsoft Entra ID berdasarkan daftar UPN dari file CSV tanpa header. Script menampilkan progres eksekusi di konsol, mengambil informasi DisplayName, UPN, serta nomor telepon (BusinessPhones dan MobilePhone), lalu mengekspor hasil ke file CSV." -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Yellow
 
 ## ==========================================================================
-#                           KONFIRMASI EKSEKUSI
+##                          KONFIRMASI EKSEKUSI
 ## ==========================================================================
 
 $confirmation = Read-Host "Apakah Anda ingin menjalankan skrip ini? (Y/N)"
@@ -120,82 +123,71 @@ if ($confirmation -ne "Y") {
 }
 
 ## ==========================================================================
-##                  FUNGSI GENERATOR PASSWORD & KONEKSI
+##                          PRASYARAT DAN KONEKSI
 ## ==========================================================================
 
-# Fungsi untuk membuat password acak 12 karakter yang aman
-function Generate-RandomPassword {
-    $length = 12
-    $chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
-    $randomPassword = ""
-    for ($i = 0; $i -lt $length; $i++) {
-        $randomPassword += $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
-    }
-    return $randomPassword
-}
-
-Write-Host "`n--- 2. Membangun Koneksi ke Microsoft Entra ---" -ForegroundColor Blue
-
-try {
-    Write-Host "Menghubungkan ke Microsoft Entra..." -ForegroundColor Yellow
-    Connect-Entra -Scopes 'User.ReadWrite.All' -ErrorAction Stop
-    Write-Host "Koneksi Berhasil." -ForegroundColor Green
-} catch {
-    Write-Error "Gagal terhubung: $($_.Exception.Message)"
-    exit 1
+Write-Host "--- 1. Menyiapkan Lingkungan ---" -ForegroundColor Blue 
+if (-not (Get-MgContext -ErrorAction SilentlyContinue)) { 
+    Connect-MgGraph -Scopes "User.Read.All" -ErrorAction Stop | Out-Null
 }
 
 ## ==========================================================================
 ##                          LOGIKA UTAMA SCRIPT
 ## ==========================================================================
 
-Write-Host "`n--- 3. Memulai Proses Reset Password Otomatis ---" -ForegroundColor Magenta
+Write-Host "`n--- 2. Memulai Logika Utama Skrip ---" -ForegroundColor Magenta 
 
-if (Test-Path $inputFilePath) {
-    # Import CSV (Asumsi: File hanya berisi daftar email tanpa header)
-    $users = Import-Csv $inputFilePath -Header "TempColumn" | Where-Object { $_.TempColumn -ne $null -and $_.TempColumn.Trim() -ne "" }
-    $totalUsers = $users.Count
-    $counter = 0
+if (-not (Test-Path $inputFilePath)) {
+    Write-Host " ERROR: File '$inputFileName' tidak ditemukan!" -ForegroundColor Red
+    exit 1
+}
 
-    foreach ($user in $users) {
-        $counter++
-        $targetUser = $user.TempColumn.Trim()
+# Membaca CSV dengan Header manual karena file asli tidak memiliki judul kolom
+$csvData = Import-Csv -Path $inputFilePath -Header "Email" -ErrorAction SilentlyContinue
+
+if ($null -eq $csvData -or $csvData.Count -eq 0) {
+    Write-Host " ERROR: File CSV kosong." -ForegroundColor Red
+    exit 1
+}
+
+$totalData = $csvData.Count
+$i = 0
+
+foreach ($row in $csvData) {
+    $i++
+    
+    # Ambil nilai email
+    $targetUser = if ($row.Email) { $row.Email.Trim() } else { $null }
+    
+    if ([string]::IsNullOrWhiteSpace($targetUser)) { continue }
+
+    # FORMAT OUTPUT SESUAI PERMINTAAN: -> [i/total] Memproses: email@domain.com
+    Write-Host "-> [$($i)/$($totalData)] Memproses: $($targetUser)" -ForegroundColor White
+
+    try {
+        $userObj = Get-MgUser -UserId $targetUser -Property "UserPrincipalName","DisplayName","BusinessPhones","MobilePhone" -ErrorAction Stop
         
-        # Buat Password Baru secara acak untuk user ini
-        $autoGeneratedPassword = Generate-RandomPassword
+        $phones = @()
+        if ($userObj.BusinessPhones) { $phones += ($userObj.BusinessPhones -join ", ") }
+        if ($userObj.MobilePhone) { $phones += $userObj.MobilePhone }
         
-        # Tampilan progres baris tunggal
-        $statusText = "-> [$counter/$totalUsers] Memproses: $targetUser . . ."
-        Write-Host "`r$statusText" -ForegroundColor Green -NoNewline
+        $contactInfo = if ($phones.Count -gt 0) { $phones -join " | " } else { "-" }
 
-        try {
-            # Eksekusi Reset Password
-            Set-EntraUser -UserId $targetUser -PasswordProfile @{
-                Password = $autoGeneratedPassword
-                ForceChangePasswordNextSignIn = $true
-            } -ErrorAction Stop
-
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = $autoGeneratedPassword # Simpan password di log CSV
-                Status            = "SUCCESS"
-                Message           = "Password auto-generated and reset"
-            }
-        } catch {
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = "-"
-                Status            = "FAILED"
-                Message           = $_.Exception.Message
-            }
-        }
-        [void]$scriptOutput.Add($res)
+        [void]$scriptOutput.Add([PSCustomObject]@{
+            InputUser   = $targetUser
+            DisplayName = $userObj.DisplayName
+            UPN         = $userObj.UserPrincipalName
+            Contact     = $contactInfo
+        })
     }
-    Write-Host "`n`nPemrosesan Selesai." -ForegroundColor Green
-} else {
-    Write-Host "ERROR: File '$inputFileName' tidak ditemukan!" -ForegroundColor Red
+    catch {
+        [void]$scriptOutput.Add([PSCustomObject]@{
+            InputUser   = $targetUser
+            DisplayName = "NOT FOUND"
+            UPN         = "-"
+            Contact     = "-"
+        })
+    }
 }
 
 ## ==========================================================================
