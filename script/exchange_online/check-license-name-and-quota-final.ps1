@@ -4,7 +4,7 @@
 # =========================================================================
 
 # Variabel Global dan Output
-$scriptName = "LicenseQuotaReport" 
+$scriptName = "LicenseQuotaReport"
 $scriptOutput = @()
 
 # Tentukan jalur dan nama file output dinamis
@@ -17,7 +17,7 @@ $scriptDir = if ($PSScriptRoot) {$PSScriptRoot} else {(Get-Location).Path}
 $outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 
 # ==========================================================================
-#                           INFORMASI SCRIPT                
+#                           INFORMASI SCRIPT
 # ==========================================================================
 
 Write-Host "`n================================================" -ForegroundColor Yellow
@@ -58,11 +58,11 @@ try {
 
     $totalSkus = $subscribedSkus.Count
     Write-Host "Ditemukan $($totalSkus) SKU Lisensi Aktif." -ForegroundColor Green
-    
+
     $i = 0
     foreach ($sku in $subscribedSkus) {
         $i++
-        
+
         Write-Progress -Activity "Collecting License Quota Data" `
                        -Status "Processing License $i of ${totalSkus}: $($sku.SkuName)" `
                        -PercentComplete ([int](($i / $totalSkus) * 100))
@@ -71,10 +71,9 @@ try {
         $totalUnits = $sku.PrepaidUnits.Enabled
         $consumedUnits = $sku.ConsumedUnits
         $availableUnits = $totalUnits - $consumedUnits
-        
+
         # Bangun objek kustom untuk diekspor
         $scriptOutput += [PSCustomObject]@{
-            LicenseName = $sku.SkuName
             SkuPartNumber = $sku.SkuPartNumber
             CapabilityStatus = $sku.CapabilityStatus
             TotalUnits = $totalUnits
@@ -82,7 +81,7 @@ try {
             AvailableUnits = $availableUnits
         }
     }
-    
+
     Write-Progress -Activity "Collecting License Data Complete" -Status "Exporting Results" -Completed
 
     # Tampilkan di Konsol (Wajib Sesuai Permintaan)
@@ -112,11 +111,11 @@ catch {
 if ($scriptOutput.Count -gt 0) {
     # 1. Tentukan nama folder
     $exportFolderName = "exported_data"
-    
+
     # 2. Ambil jalur dua tingkat di atas direktori skrip
     # Contoh: Jika skrip di C:\Users\Erik\Project\Scripts, maka ini ke C:\Users\Erik\
     $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-    
+
     # 3. Gabungkan menjadi jalur folder ekspor
     $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
 
@@ -129,10 +128,10 @@ if ($scriptOutput.Count -gt 0) {
     # 5. Tentukan nama file dan jalur lengkap
     $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
     $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-    
+
     # 6. Ekspor data
     $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
-    
+
     Write-Host "`nSemua proses selesai!" -ForegroundColor Green
     Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
 }

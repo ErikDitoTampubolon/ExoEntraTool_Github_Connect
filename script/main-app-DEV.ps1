@@ -32,33 +32,33 @@ foreach ($folder in $folders) {
 }
 
 # 3. Fungsi untuk Download File dari GitHub
-function Sync-GitHubRepo {
-    param (
-        [string]$RepoPath,    # Path di folder lokal
-        [string]$GitHubUrl    # URL folder di GitHub (Raw Content API)
-    )
+# function Sync-GitHubRepo {
+#     param (
+#         [string]$RepoPath,    # Path di folder lokal
+#         [string]$GitHubUrl    # URL folder di GitHub (Raw Content API)
+#     )
 
-    Write-Host "`n[*] Sinkronisasi file ke folder: $RepoPath" -ForegroundColor Cyan
+#     Write-Host "`n[*] Sinkronisasi file ke folder: $RepoPath" -ForegroundColor Cyan
 
-    # Mapping URL GitHub Tree ke Raw Content API
-    # Contoh: mengubah URL tree menjadi API konten
-    $apiUrl = $GitHubUrl -replace "github.com", "api.github.com/repos" -replace "tree/main", "contents"
+#     # Mapping URL GitHub Tree ke Raw Content API
+#     # Contoh: mengubah URL tree menjadi API konten
+#     $apiUrl = $GitHubUrl -replace "github.com", "api.github.com/repos" -replace "tree/main", "contents"
 
-    try {
-        $files = Invoke-RestMethod -Uri $apiUrl -Method Get -ErrorAction Stop
-        foreach ($file in $files) {
-            if ($file.type -eq "file") {
-                $destination = Join-Path -Path (Join-Path $scriptDir $RepoPath) -ChildPath $file.name
+#     try {
+#         $files = Invoke-RestMethod -Uri $apiUrl -Method Get -ErrorAction Stop
+#         foreach ($file in $files) {
+#             if ($file.type -eq "file") {
+#                 $destination = Join-Path -Path (Join-Path $scriptDir $RepoPath) -ChildPath $file.name
 
-                Write-Host " -> Mendownload: $($file.name) . . ." -ForegroundColor White -NoNewline
-                Invoke-WebRequest -Uri $file.download_url -OutFile $destination
-                Write-Host " [BERHASIL]" -ForegroundColor Green
-            }
-        }
-    } catch {
-        Write-Host " [GAGAL] Tidak dapat mengakses repositori: $($_.Exception.Message)" -ForegroundColor Red
-    }
-}
+#                 Write-Host " -> Mendownload: $($file.name) . . ." -ForegroundColor White -NoNewline
+#                 Invoke-WebRequest -Uri $file.download_url -OutFile $destination
+#                 Write-Host " [BERHASIL]" -ForegroundColor Green
+#             }
+#         }
+#     } catch {
+#         Write-Host " [GAGAL] Tidak dapat mengakses repositori: $($_.Exception.Message)" -ForegroundColor Red
+#     }
+# }
 
 # 4. Eksekusi Sinkronisasi
 $repoExchange = "https://github.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/tree/main/script/exchange_online"
@@ -218,7 +218,7 @@ while ($mainRunning) {
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User"
+                Write-Host "  1. Assign or Remove License User test"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
