@@ -135,6 +135,18 @@ function Sync-GitHubRepo {
     }
 }
 
+# 4. Eksekusi Sinkronisasi untuk Exchange Online dan Entra
+Write-Host "`n--- 2. Sinkronisasi Script dari GitHub Repository ---" -ForegroundColor Blue
+
+$repoExchangeUrl = "https://github.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/tree/main/script/exchange_online"
+$repoEntraUrl = "https://github.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/tree/main/script/entra"
+
+# Sinkronisasi Exchange Online Scripts
+Sync-GitHubRepo -RepoPath "script/exchange_online" -GitHubUrl $repoExchangeUrl
+
+# Sinkronisasi Entra Scripts
+Sync-GitHubRepo -RepoPath "script/entra" -GitHubUrl $repoEntraUrl
+
 Write-Host "`n--- Infrastruktur Siap. Melanjutkan ke Logika Utama ---" -ForegroundColor Blue
 
 # --- Memeriksa Lingkungan PowerShell ---
@@ -284,7 +296,7 @@ while ($mainRunning) {
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User Test"
+                Write-Host "  1. Assign or Remove License User asdas"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
