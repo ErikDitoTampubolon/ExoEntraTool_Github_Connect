@@ -1,16 +1,93 @@
 # =========================================================================
 # AUTHOR   : Erik Dito Tampubolon - TelkomSigma
-# VERSION  : 1.1
-# DESKRIPSI: Skrip Utama dengan ASCII Art Header "ExoEntraTool"
+# VERSION  : 2.0 (dengan Auto-Update Terintegrasi)
+# DESKRIPSI: ExoEntraTool dengan Auto-Update dari GitHub
 # =========================================================================
 
 # ==========================================================================
-# INFRASTRUCTURE & REPOSITORY SYNC SYSTEM
-# AUTHOR: Erik Dito Tampubolon
+# AUTO-UPDATE SYSTEM - SELALU MENDAPATKAN VERSI TERBARU
 # ==========================================================================
 
 # 1. Tentukan Path Dasar
 $scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+
+# Konfigurasi URL GitHub
+$GitHubMainScript = "https://raw.githubusercontent.com/ErikDitoTampubolon/ExoEntraTool_Github_Connect/dev/script/main-app-DEV.ps1"
+$LocalMainScript = Join-Path -Path $scriptDir -ChildPath "main-app-DEV-latest.ps1"
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "  ExoEntraTool - Auto Update Check" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host ""
+
+# Fungsi untuk mengecek dan update script
+function Check-AndUpdate {
+    Write-Host "[*] Memeriksa pembaruan dari GitHub..." -ForegroundColor Yellow
+    
+    try {
+        # Tentukan path script saat ini (work untuk .ps1 dan .exe)
+        $currentScript = if ($PSCommandPath) { 
+            $PSCommandPath 
+        } elseif ($MyInvocation.MyCommand.Path) { 
+            $MyInvocation.MyCommand.Path 
+        } else {
+            Join-Path -Path $scriptDir -ChildPath "main-app-DEV.ps1"
+        }
+        
+        # Skip update jika dijalankan sebagai EXE
+        if ($currentScript -match '\.exe$') {
+            Write-Host "[*] Berjalan sebagai EXE. Auto-update dinonaktifkan." -ForegroundColor Gray
+            Write-Host "[*] Untuk update, jalankan ulang ExoEntraTool_Updater.ps1" -ForegroundColor Cyan
+            Start-Sleep -Seconds 2
+            return
+        }
+        
+        # Download versi terbaru
+        $ProgressPreference = 'SilentlyContinue'
+        Invoke-WebRequest -Uri $GitHubMainScript -OutFile $LocalMainScript -UseBasicParsing -ErrorAction Stop
+        $ProgressPreference = 'Continue'
+        
+        if (Test-Path $LocalMainScript) {
+            $latestContent = Get-Content $LocalMainScript -Raw -ErrorAction SilentlyContinue
+            $currentContent = Get-Content $currentScript -Raw -ErrorAction SilentlyContinue
+            
+            if ($latestContent -and $currentContent -and ($latestContent -ne $currentContent)) {
+                Write-Host "[!] Versi baru tersedia! Memperbarui..." -ForegroundColor Green
+                
+                # Backup versi lama
+                $backupPath = "$currentScript.backup"
+                Copy-Item $currentScript -Destination $backupPath -Force -ErrorAction SilentlyContinue
+                
+                # Update ke versi terbaru
+                Copy-Item $LocalMainScript -Destination $currentScript -Force
+                Remove-Item $LocalMainScript -Force
+                
+                Write-Host "[OK] Script berhasil diperbarui!" -ForegroundColor Green
+                Write-Host "[*] Memulai ulang dengan versi terbaru..." -ForegroundColor Cyan
+                Start-Sleep -Seconds 2
+                
+                # Jalankan ulang script yang sudah diupdate
+                & $currentScript
+                exit
+            } else {
+                Write-Host "[OK] Anda sudah menggunakan versi terbaru." -ForegroundColor Green
+                Remove-Item $LocalMainScript -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch {
+        Write-Host "[!] Tidak dapat memeriksa update: $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "[*] Melanjutkan dengan versi lokal..." -ForegroundColor Gray
+    }
+    
+    Write-Host ""
+}
+
+# Jalankan auto-update check
+Check-AndUpdate
+
+# ==========================================================================
+# INFRASTRUCTURE & REPOSITORY SYNC SYSTEM
+# ==========================================================================
 
 # 2. Daftar Folder yang Akan Dibuat
 $folders = @(
@@ -34,14 +111,12 @@ foreach ($folder in $folders) {
 # 3. Fungsi untuk Download File dari GitHub
 function Sync-GitHubRepo {
     param (
-        [string]$RepoPath,    # Path di folder lokal
-        [string]$GitHubUrl    # URL folder di GitHub (Raw Content API)
+        [string]$RepoPath,
+        [string]$GitHubUrl
     )
 
     Write-Host "`n[*] Sinkronisasi file ke folder: $RepoPath" -ForegroundColor Cyan
     
-    # Mapping URL GitHub Tree ke Raw Content API
-    # Contoh: mengubah URL tree menjadi API konten
     $apiUrl = $GitHubUrl -replace "github.com", "api.github.com/repos" -replace "tree/main", "contents"
 
     try {
@@ -60,10 +135,6 @@ function Sync-GitHubRepo {
     }
 }
 
-# 4. Eksekusi Sinkronisasi
-$repoExchange = "https://github.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/tree/main/script/exchange_online"
-$repoEntra = "https://github.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/tree/main/script/entra"
-
 Write-Host "`n--- Infrastruktur Siap. Melanjutkan ke Logika Utama ---" -ForegroundColor Blue
 
 # --- Memeriksa Lingkungan PowerShell ---
@@ -80,7 +151,7 @@ function Check-Module {
     }
 }
 
-Write-Host "--- Prasyarat Modul ---" -ForegroundColor Blue
+Write-Host "`n--- Prasyarat Modul ---" -ForegroundColor Blue
 Check-Module -ModuleName "PowerShellGet"
 Check-Module -ModuleName "ExchangeOnlineManagement"
 Check-Module -ModuleName "Microsoft.Graph"
@@ -116,24 +187,22 @@ try {
     Write-Host "Peringatan: Gagal terkoneksi ke Entra." -ForegroundColor Yellow
 }
 
-# 2.3 KONEKSI EXCHANGE ONLINE (WAJIB - DENGAN ERROR HANDLING LENGKAP)
+# 2.3 KONEKSI EXCHANGE ONLINE
 Write-Host "Menghubungkan ke Exchange Online" -ForegroundColor Yellow
 
-# Cek apakah sudah ada sesi Exchange Online
 $existingSession = Get-PSSession | Where-Object { $_.ConfigurationName -eq "Microsoft.Exchange" }
 
 if (-not $existingSession) {
-try {
-# Connect dengan ShowProgress TRUE agar user tahu proses login berjalan
-Connect-ExchangeOnline -ShowProgress $true -ErrorAction Stop
-Write-Host "Koneksi ke Exchange Online berhasil" -ForegroundColor Green
+    try {
+        Connect-ExchangeOnline -ShowProgress $true -ErrorAction Stop
+        Write-Host "Koneksi ke Exchange Online berhasil" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "`nGagal terhubung ke Exchange Online!" -ForegroundColor Red
+        Write-Host "Detail Error: $($_.Exception.Message)" -ForegroundColor Yellow
+        exit 1
+    }
 }
-catch {
-Write-Host "`nGagal terhubung ke Exchange Online!" -ForegroundColor Red
-Write-Host "Detail Error: $($_.Exception.Message)" -ForegroundColor Yellow
-
-exit 1
-}}
 
 Write-Host "`nSemua layanan terhubung. Memuat antarmuka..." -ForegroundColor Green
 Start-Sleep -Seconds 1
@@ -141,18 +210,16 @@ Start-Sleep -Seconds 1
 # --- FUNGSI DOWNLOAD ON DEMAND ---
 function Get-AndExecute {
     param (
-        [string]$SubFolder, # "exchange_online" atau "entra"
+        [string]$SubFolder,
         [string]$FileName
     )
 
     $localPath = Join-Path $scriptDir "script\$SubFolder\$FileName"
     $githubUrl = "https://raw.githubusercontent.com/ErikDitoTampubolon/ExchangeOnlineTools-ErikDito/main/script/$SubFolder/$FileName"
 
-    # Jika file belum ada, download dari GitHub Raw
     if (-not (Test-Path $localPath)) {
         Write-Host "`n[!] Download Script." -ForegroundColor Cyan
         try {
-            # Pastikan folder tujuan ada
             $destFolder = Split-Path $localPath
             if (-not (Test-Path $destFolder)) { New-Item -Path $destFolder -ItemType Directory | Out-Null }
             
@@ -165,7 +232,6 @@ function Get-AndExecute {
         }
     }
 
-    # Jalankan skrip
     & $localPath
     Pause
 }
@@ -188,7 +254,7 @@ function Show-Header {
     Write-Host $ascii -ForegroundColor Cyan
     Write-Host "======================================================================" -ForegroundColor DarkCyan
     Write-Host " Author   : Erik Dito Tampubolon - TelkomSigma" -ForegroundColor White
-    Write-Host " Version  : 1.1 (ExoEntraTool Suite)" -ForegroundColor White
+    Write-Host " Version  : 2.0 (ExoEntraTool Suite - Auto-Update Enabled)" -ForegroundColor White
     Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkCyan
     Write-Host " Location : ${scriptDir}" -ForegroundColor Gray
     Write-Host " Time     : $(Get-Date -Format 'dd-MM-yyyy HH:mm:ss')" -ForegroundColor Gray  
@@ -218,7 +284,7 @@ while ($mainRunning) {
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User"
+                Write-Host "  1. Assign or Remove License User Testing"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
