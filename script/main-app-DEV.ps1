@@ -23,17 +23,17 @@ Write-Host ""
 # Fungsi untuk mengecek dan update script
 function Check-AndUpdate {
     Write-Host "[*] Memeriksa pembaruan dari GitHub..." -ForegroundColor Yellow
-    
+
     try {
         # Tentukan path script saat ini (work untuk .ps1 dan .exe)
-        $currentScript = if ($PSCommandPath) { 
-            $PSCommandPath 
-        } elseif ($MyInvocation.MyCommand.Path) { 
-            $MyInvocation.MyCommand.Path 
+        $currentScript = if ($PSCommandPath) {
+            $PSCommandPath
+        } elseif ($MyInvocation.MyCommand.Path) {
+            $MyInvocation.MyCommand.Path
         } else {
             Join-Path -Path $scriptDir -ChildPath "main-app-DEV.ps1"
         }
-        
+
         # Skip update jika dijalankan sebagai EXE
         if ($currentScript -match '\.exe$') {
             Write-Host "[*] Berjalan sebagai EXE. Auto-update dinonaktifkan." -ForegroundColor Gray
@@ -41,31 +41,31 @@ function Check-AndUpdate {
             Start-Sleep -Seconds 2
             return
         }
-        
+
         # Download versi terbaru
         $ProgressPreference = 'SilentlyContinue'
         Invoke-WebRequest -Uri $GitHubMainScript -OutFile $LocalMainScript -UseBasicParsing -ErrorAction Stop
         $ProgressPreference = 'Continue'
-        
+
         if (Test-Path $LocalMainScript) {
             $latestContent = Get-Content $LocalMainScript -Raw -ErrorAction SilentlyContinue
             $currentContent = Get-Content $currentScript -Raw -ErrorAction SilentlyContinue
-            
+
             if ($latestContent -and $currentContent -and ($latestContent -ne $currentContent)) {
                 Write-Host "[!] Versi baru tersedia! Memperbarui..." -ForegroundColor Green
-                
+
                 # Backup versi lama
                 $backupPath = "$currentScript.backup"
                 Copy-Item $currentScript -Destination $backupPath -Force -ErrorAction SilentlyContinue
-                
+
                 # Update ke versi terbaru
                 Copy-Item $LocalMainScript -Destination $currentScript -Force
                 Remove-Item $LocalMainScript -Force
-                
+
                 Write-Host "[OK] Script berhasil diperbarui!" -ForegroundColor Green
                 Write-Host "[*] Memulai ulang dengan versi terbaru..." -ForegroundColor Cyan
                 Start-Sleep -Seconds 2
-                
+
                 # Jalankan ulang script yang sudah diupdate
                 & $currentScript
                 exit
@@ -78,7 +78,7 @@ function Check-AndUpdate {
         Write-Host "[!] Tidak dapat memeriksa update: $($_.Exception.Message)" -ForegroundColor Yellow
         Write-Host "[*] Melanjutkan dengan versi lokal..." -ForegroundColor Gray
     }
-    
+
     Write-Host ""
 }
 
@@ -116,7 +116,7 @@ function Sync-GitHubRepo {
     )
 
     Write-Host "`n[*] Sinkronisasi file ke folder: $RepoPath" -ForegroundColor Cyan
-    
+
     $apiUrl = $GitHubUrl -replace "github.com", "api.github.com/repos" -replace "tree/main", "contents"
 
     try {
@@ -124,7 +124,7 @@ function Sync-GitHubRepo {
         foreach ($file in $files) {
             if ($file.type -eq "file") {
                 $destination = Join-Path -Path (Join-Path $scriptDir $RepoPath) -ChildPath $file.name
-                
+
                 Write-Host " -> Mendownload: $($file.name) . . ." -ForegroundColor White -NoNewline
                 Invoke-WebRequest -Uri $file.download_url -OutFile $destination
                 Write-Host " [BERHASIL]" -ForegroundColor Green
@@ -222,7 +222,7 @@ function Get-AndExecute {
         try {
             $destFolder = Split-Path $localPath
             if (-not (Test-Path $destFolder)) { New-Item -Path $destFolder -ItemType Directory | Out-Null }
-            
+
             Invoke-WebRequest -Uri $githubUrl -OutFile $localPath -ErrorAction Stop
             Write-Host "[OK] Download Berhasil." -ForegroundColor Green
         } catch {
@@ -243,8 +243,8 @@ function Get-AndExecute {
 function Show-Header {
     Clear-Host
     $ascii = @'
-  _____              ______       _               _______           _ 
- |  ___|            |  ____|     | |             |__   __|         | | 
+  _____              ______       _               _______           _
+ |  ___|            |  ____|     | |             |__   __|         | |
  | |__  __  _____   | |__   _ __ | |_ _ __ __ _     | | ___   ___  | |
  |  __| \ \/ / _ \  |  __| | '_ \| __| '__/ _` |    | |/ _ \ / _ \ | |
  | |___  >  < (_) | | |____| | | | |_| | | (_| |    | | (_) | (_) || |
@@ -257,7 +257,7 @@ function Show-Header {
     Write-Host " Version  : 2.0 (ExoEntraTool Suite - Auto-Update Enabled)" -ForegroundColor White
     Write-Host "----------------------------------------------------------------------" -ForegroundColor DarkCyan
     Write-Host " Location : ${scriptDir}" -ForegroundColor Gray
-    Write-Host " Time     : $(Get-Date -Format 'dd-MM-yyyy HH:mm:ss')" -ForegroundColor Gray  
+    Write-Host " Time     : $(Get-Date -Format 'dd-MM-yyyy HH:mm:ss')" -ForegroundColor Gray
     Write-Host "======================================================================" -ForegroundColor DarkCyan
     Write-Host ""
 }
@@ -275,16 +275,16 @@ while ($mainRunning) {
     Write-Host ""
     Write-Host "  10. Keluar & Putus Koneksi" -ForegroundColor Red
     Write-Host "======================================================================" -ForegroundColor DarkCyan
-    
+
     $mainChoice = Read-Host "Pilih nomor menu"
 
     switch ($mainChoice) {
-        "1" { 
+        "1" {
             $subRunning = $true
             while ($subRunning) {
                 Show-Header
                 Write-Host "Sub-Menu: Microsoft Exchange Online" -ForegroundColor Yellow
-                Write-Host "  1. Assign or Remove License User Testing 2"
+                Write-Host "  1. Assign or Remove License User Test"
                 Write-Host "  2. Export List License Availability"
                 Write-Host "  3. Export List All Mailbox"
                 Write-Host "  4. Export List All Active User"
@@ -302,7 +302,7 @@ while ($mainRunning) {
                 Write-Host ""
                 Write-Host "  B. Kembali ke Menu Utama" -ForegroundColor Yellow
                 Write-Host "---------------------------------------------" -ForegroundColor DarkCyan
-                
+
                 $subChoice = Read-Host "Pilih nomor menu"
                 if ($subChoice.ToUpper() -eq "B") { $subRunning = $false }
                 elseif ($subChoice -eq "1") { Get-AndExecute -SubFolder "exchange_online" -FileName "assign-or-remove-license-user-final.ps1" }
@@ -322,7 +322,7 @@ while ($mainRunning) {
                 elseif ($subChoice -eq "15") { Get-AndExecute -SubFolder "exchange_online" -FileName "export-onedrive-folder-file-user.ps1" }
             }
         }
-        "2" { 
+        "2" {
             $subRunning = $true
             while ($subRunning) {
                 Show-Header
@@ -347,7 +347,7 @@ while ($mainRunning) {
                 Write-Host ""
                 Write-Host "  B. Kembali ke Menu Utama" -ForegroundColor Yellow
                 Write-Host "---------------------------------------------" -ForegroundColor DarkCyan
-                
+
                 $subChoice = Read-Host "Pilih nomor menu"
                 if ($subChoice.ToUpper() -eq "B") { $subRunning = $false }
                 elseif ($subChoice -eq "1") { Get-AndExecute -SubFolder "entra" -FileName "enable-or-disable-mfa-user-by-csv-final.ps1" }
@@ -376,9 +376,9 @@ while ($mainRunning) {
             Disconnect-MgGraph -ErrorAction SilentlyContinue
             $mainRunning = $false
         }
-        default { 
+        default {
             Write-Host "Pilihan tidak valid!" -ForegroundColor Red
-            Start-Sleep -Seconds 1 
+            Start-Sleep -Seconds 1
         }
     }
 }
