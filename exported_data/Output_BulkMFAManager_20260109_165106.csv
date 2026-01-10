@@ -1,0 +1,2 @@
+﻿"Timestamp";"UserAccount";"Operation";"Status";"Message"
+"2026-01-09 16:51:22";"admin@M365x57702712.onmicrosoft.com";;"FAILED";"Cannot validate argument on parameter 'PerUserMfaState'. The argument """" does not belong to the set ""Enabled,Disabled,Enforced"" specified by the ValidateSet attribute. Supply an argument that is in the set and then try the command again."

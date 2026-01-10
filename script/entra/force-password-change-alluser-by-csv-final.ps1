@@ -1,231 +1,238 @@
-# =========================================================================
-# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.6)
-# Nama Skrip: Bulk-EntraPasswordReset-AutoGenerate
-# Deskripsi: Reset password massal dengan password acak yang dibuat sistem.
-# =========================================================================
+# =========================================================================  
+# FRAMEWORK SCRIPT POWERSHELL DENGAN EKSPOR OTOMATIS (V2.1)  
+# Nama Skrip: Bulk-PasswordReset-AutoGenerate
+# Deskripsi: Reset password massal dengan password acak dan ekspor hasil ke CSV.
+# =========================================================================  
 
-# 1. Konfigurasi File Input & Path
-$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-$parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-
-# Variabel Global dan Output
-$scriptName = "AutoPasswordResetReport" 
+# Variabel Global dan Output  
+$scriptName = "BulkPasswordReset" 
 $scriptOutput = [System.Collections.ArrayList]::new() 
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputFileName = "Output_$($scriptName)_$($timestamp).csv"
-$outputFilePath = Join-Path -Path $scriptDir -ChildPath $outputFileName
 
-# ==========================================================================
-#                    DETEKSI DAN PEMILIHAN FILE CSV
-# ==========================================================================
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }  
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"  
 
-Write-Host "`n--- Mencari file CSV di: $parentDir ---" -ForegroundColor Blue
+$outputFileName = "Output_$($scriptName)_$($timestamp).csv"  
 
-# Mencari semua file .csv di folder 2 tingkat di atas script
-$csvFiles = Get-ChildItem -Path $parentDir -Filter "*.csv"
+# Definisi parentDir (2 tingkat di atas)  
+$parentDir = (Get-Item $scriptDir).Parent.Parent.FullName  
 
-if ($csvFiles.Count -eq 0) {
-    Write-Host "Tidak ditemukan file CSV di direktori: $parentDir" -ForegroundColor Yellow
-    
-    $newFileName = "daftar_email.csv"
-    $newFilePath = Join-Path -Path $parentDir -ChildPath $newFileName
-    
-    Write-Host "Membuat file CSV baru: $newFileName" -ForegroundColor Cyan
-    $null | Out-File -FilePath $newFilePath -Encoding utf8
-    
-    Write-Host "File berhasil dibuat." -ForegroundColor Green
-    
-    # ALERT MESSAGE: Memastikan pengguna mengisi file sebelum lanjut
-    Write-Host "`n==========================================================" -ForegroundColor Yellow
-    $checkFill = Read-Host "Apakah Anda sudah mengisi daftar email di file $newFileName? (Y/N)"
-    Write-Host "==========================================================" -ForegroundColor Yellow
+## ==========================================================================  
+#                           INFORMASI SCRIPT                  
+## ==========================================================================  
 
-    if ($checkFill -ne "Y") {
-        Write-Host "`nSilakan isi file CSV terlebih dahulu, lalu jalankan ulang skrip." -ForegroundColor Red
-        # Membuka file secara otomatis agar pengguna bisa langsung mengisi
-        Start-Process notepad.exe $newFilePath
-        return
-    }
+Write-Host "`n================================================" -ForegroundColor Yellow  
+Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow  
+Write-Host "================================================" -ForegroundColor Yellow  
+Write-Host " Nama Skrip        : $scriptName.ps1" -ForegroundColor Yellow  
+Write-Host " Field Kolom       : [Timestamp], [UserPrincipalName], [TemporaryPassword], [Status], [Message]" -ForegroundColor Yellow  
+Write-Host " Deskripsi Singkat : Melakukan reset password massal (CSV/All Users) dengan password acak 12 karakter." -ForegroundColor Cyan  
+Write-Host "==========================================================" -ForegroundColor Yellow  
 
-    $inputFilePath = $newFilePath
-    $inputFileName = $newFileName
-}
-else {
-    Write-Host "File CSV yang ditemukan:" -ForegroundColor Yellow
-    for ($i = 0; $i -lt $csvFiles.Count; $i++) {
-        Write-Host "$($i + 1). $($csvFiles[$i].Name)" -ForegroundColor Cyan
-    }
+## ==========================================================================  
+#                           KONFIRMASI EKSEKUSI  
+## ==========================================================================  
 
-    $fileChoice = Read-Host "`nPilih nomor file CSV yang ingin digunakan"
+$confirmation = Read-Host "Apakah Anda ingin menjalankan skrip ini? (Y/N)"  
 
-    if (-not ($fileChoice -as [int]) -or [int]$fileChoice -lt 1 -or [int]$fileChoice -gt $csvFiles.Count) {
-        Write-Host "Pilihan tidak valid. Skrip dibatalkan." -ForegroundColor Red
-        return
-    }
+if ($confirmation -ne "Y") {  
+    Write-Host "`nEksekusi skrip dibatalkan oleh pengguna." -ForegroundColor Red  
+    return  
+}  
 
-    $selectedFile = $csvFiles[[int]$fileChoice - 1]
-    $inputFilePath = $selectedFile.FullName
-    $inputFileName = $selectedFile.Name
-}
+# ==========================================================================  
+# PILIHAN METODE INPUT (CSV vs ALL USERS)  
+# ==========================================================================  
+$useAllUsers = $false  
+$validInput = $false  
+while (-not $validInput) {  
+    Write-Host "`n--- Metode Input Data ---" -ForegroundColor Blue  
+    Write-Host "1. Gunakan Daftar Email dari File CSV" -ForegroundColor Cyan  
+    Write-Host "2. Proses Seluruh Pengguna (All Users) di Tenant" -ForegroundColor Cyan  
+    $inputMethod = Read-Host "`nPilih metode (1/2)"  
+    if ($inputMethod -eq "1") {  
+        $useAllUsers = $false  
+        $validInput = $true  
+    }  
+    elseif ($inputMethod -eq "2") {  
+        $useAllUsers = $true  
+        $validInput = $true  
+        Write-Host "[OK] Mode: Seluruh Pengguna terpilih." -ForegroundColor Green  
+    }  
+    else {  
+        Write-Host "[ERROR] Pilihan tidak valid! Masukkan angka 1 atau 2." -ForegroundColor Red  
+    }  
+}  
 
-# --- LOGIKA HITUNG TOTAL EMAIL ---
-try {
-    # Ambil data untuk verifikasi isi
-    $tempData = Import-Csv -Path $inputFilePath -Header "TempColumn" -ErrorAction SilentlyContinue
-    $totalEmail = if ($tempData) { $tempData.Count } else { 0 }
-    
-    Write-Host "`nFile Terpilih: $inputFileName" -ForegroundColor Green
-    Write-Host "Total email yang terdeteksi: $totalEmail email" -ForegroundColor Cyan
-
-    # Proteksi Tambahan: Jika file terdeteksi masih 0 baris setelah konfirmasi Y
-    if ($totalEmail -eq 0) {
-        Write-Host "`nPERINGATAN: File $inputFileName terdeteksi masih KOSONG." -ForegroundColor Red
-        $reconfirm = Read-Host "Apakah Anda yakin ingin tetap melanjutkan? (Y/N)"
-        if ($reconfirm -ne "Y") { 
-            Write-Host "Eksekusi dibatalkan. Silakan isi data terlebih dahulu." -ForegroundColor Yellow
-            return 
-        }
-    }
-    Write-Host "----------------------------------------------------------"
-} catch {
-    Write-Host "Gagal membaca file CSV: $($_.Exception.Message)" -ForegroundColor Red
-    return
-}
-
-## ==========================================================================
-#                           INFORMASI SCRIPT                
-## ==========================================================================
-
-Write-Host "`n================================================" -ForegroundColor Yellow
-Write-Host "                INFORMASI SCRIPT                " -ForegroundColor Yellow
-Write-Host "================================================" -ForegroundColor Yellow
-Write-Host " Nama Skrip        : Bulk-EntraPasswordReset-AutoGenerate" -ForegroundColor Yellow
-Write-Host " Field Kolom       : [Timestamp]
-                     [UserPrincipalName]
-                     [TemporaryPassword]
-                     [Status]
-                     [Message]" -ForegroundColor Yellow
-Write-Host " Deskripsi Singkat : Script ini berfungsi untuk melakukan reset password massal pada pengguna Microsoft Entra ID dengan password acak yang digenerate otomatis oleh sistem. Password baru dicatat dalam laporan CSV bersama status eksekusi dan pesan hasil." -ForegroundColor Cyan
-Write-Host "==========================================================" -ForegroundColor Yellow
-
-## ==========================================================================
-#                           KONFIRMASI EKSEKUSI
-## ==========================================================================
-
-$confirmation = Read-Host "Apakah Anda ingin menjalankan skrip ini? (Y/N)"
-
-if ($confirmation -ne "Y") {
-    Write-Host "`nEksekusi skrip dibatalkan oleh pengguna." -ForegroundColor Red
-    return
+if (-not $useAllUsers) {  
+    $csvFiles = Get-ChildItem -Path $parentDir -Filter "*.csv"  
+    if ($csvFiles.Count -eq 0) {  
+        $newFileName = "daftar_email.csv"  
+        $newFilePath = Join-Path -Path $parentDir -ChildPath $newFileName  
+        Write-Host "Membuat file CSV baru: $newFileName" -ForegroundColor Cyan  
+        $null | Out-File -FilePath $newFilePath -Encoding utf8  
+          
+        Write-Host "`n==========================================================" -ForegroundColor Yellow  
+        $checkFill = Read-Host "Apakah Anda sudah mengisi daftar email di file $newFileName? (Y/N)"  
+        if ($checkFill -ne "Y") {  
+            Write-Host "`nSilakan isi file CSV terlebih dahulu." -ForegroundColor Red  
+            Start-Process notepad.exe $newFilePath  
+            return  
+        }  
+        $inputFilePath = $newFilePath  
+        $inputFileName = $newFileName  
+    } else {  
+        $validFileChoice = $false  
+        while (-not $validFileChoice) {  
+            Write-Host "`nFile CSV yang ditemukan:" -ForegroundColor Yellow  
+            for ($i = 0; $i -lt $csvFiles.Count; $i++) {  
+                Write-Host "$($i + 1). $($csvFiles[$i].Name)" -ForegroundColor Cyan  
+            }  
+            $fileChoice = Read-Host "`nPilih nomor file CSV yang ingin digunakan"  
+            if ($fileChoice -as [int] -and [int]$fileChoice -ge 1 -and [int]$fileChoice -le $csvFiles.Count) {  
+                $selectedFile = $csvFiles[[int]$fileChoice - 1]  
+                $inputFilePath = $selectedFile.FullName  
+                $inputFileName = $selectedFile.Name  
+                $validFileChoice = $true  
+            } else {  
+                Write-Host "[ERROR] Pilihan tidak valid!" -ForegroundColor Red  
+            }  
+        }  
+    }  
 }
 
+## ==========================================================================  
+#                     PRASYARAT DAN INSTALASI MODUL  
+## ==========================================================================  
+
+Write-Host "`n--- Memeriksa dan Menyiapkan Lingkungan PowerShell ---" -ForegroundColor Blue  
+
+Set-ExecutionPolicy RemoteSigned -Scope Process -Force -ErrorAction SilentlyContinue
+
+function CheckAndInstallModule {  
+    param([string]$ModuleName)  
+    Write-Host "Memeriksa Modul '$ModuleName'..." -ForegroundColor Cyan  
+    if (-not (Get-Module -Name $ModuleName -ListAvailable)) {  
+        Write-Host "Menginstal '$ModuleName'..." -ForegroundColor Yellow  
+        Install-Module -Name $ModuleName -Force -AllowClobber -Scope CurrentUser -ErrorAction Stop  
+    }  
+}  
+
+CheckAndInstallModule -ModuleName "Microsoft.Graph"  
+
+## ==========================================================================  
+##                    KONEKSI KE SCOPES YANG DIBUTUHKAN
+## ==========================================================================  
+
+Write-Host "`n--- Membangun Koneksi ke Layanan Microsoft ---" -ForegroundColor Blue  
+
+try {  
+    $requiredScopes = @("User.ReadWrite.All", "Directory.ReadWrite.All")  
+    Connect-MgGraph -Scopes $requiredScopes -ErrorAction Stop  
+    Write-Host "Koneksi ke Microsoft Graph berhasil." -ForegroundColor Green  
+} catch {  
+    Write-Error "Gagal terhubung: $($_.Exception.Message)"  
+    exit 1  
+}  
+
 ## ==========================================================================
-##                  FUNGSI GENERATOR PASSWORD & KONEKSI
+##                          FUNGSI PEMBANTU
 ## ==========================================================================
 
-# Fungsi untuk membuat password acak 12 karakter yang aman
 function Generate-RandomPassword {
-    $length = 12
-    $chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*"
-    $randomPassword = ""
-    for ($i = 0; $i -lt $length; $i++) {
-        $randomPassword += $chars[(Get-Random -Minimum 0 -Maximum $chars.Length)]
+    # Meningkatkan panjang ke 16 karakter dan memastikan variasi karakter yang lebih kuat
+    $length = 16
+    $upper   = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    $lower   = "abcdefghijkmnopqrstuvwxyz"
+    $numbers = "23456789"
+    $symbols = "!@#$%^&*"
+    
+    # Memastikan setidaknya ada satu karakter dari setiap kategori
+    $pass = @(
+        $upper[(Get-Random -Maximum $upper.Length)],
+        $lower[(Get-Random -Maximum $lower.Length)],
+        $numbers[(Get-Random -Maximum $numbers.Length)],
+        $symbols[(Get-Random -Maximum $symbols.Length)]
+    )
+
+    # Melengkapi sisa karakter secara acak
+    $allChars = $upper + $lower + $numbers + $symbols
+    for ($i = 1; $i -le ($length - 4); $i++) {
+        $pass += $allChars[(Get-Random -Maximum $allChars.Length)]
     }
-    return $randomPassword
-}
 
-Write-Host "`n--- 2. Membangun Koneksi ke Microsoft Entra ---" -ForegroundColor Blue
-
-try {
-    Write-Host "Menghubungkan ke Microsoft Entra..." -ForegroundColor Yellow
-    Connect-Entra -Scopes 'User.ReadWrite.All' -ErrorAction Stop
-    Write-Host "Koneksi Berhasil." -ForegroundColor Green
-} catch {
-    Write-Error "Gagal terhubung: $($_.Exception.Message)"
-    exit 1
+    # Mengacak urutan karakter agar tidak terprediksi
+    return (-join ($pass | Sort-Object { Get-Random }))
 }
 
 ## ==========================================================================
 ##                          LOGIKA UTAMA SCRIPT
 ## ==========================================================================
 
-Write-Host "`n--- 3. Memulai Proses Reset Password Otomatis ---" -ForegroundColor Magenta
+Write-Host "`n--- Memulai Logika Utama Skrip: $($scriptName) ---" -ForegroundColor Magenta
 
-if (Test-Path $inputFilePath) {
-    # Import CSV (Asumsi: File hanya berisi daftar email tanpa header)
-    $users = Import-Csv $inputFilePath -Header "TempColumn" | Where-Object { $_.TempColumn -ne $null -and $_.TempColumn.Trim() -ne "" }
-    $totalUsers = $users.Count
-    $counter = 0
-
-    foreach ($user in $users) {
-        $counter++
-        $targetUser = $user.TempColumn.Trim()
-        
-        # Buat Password Baru secara acak untuk user ini
-        $autoGeneratedPassword = Generate-RandomPassword
-        
-        # Tampilan progres baris tunggal
-        $statusText = "-> [$counter/$totalUsers] Memproses: $targetUser . . ."
-        Write-Host "`r$statusText" -ForegroundColor Green -NoNewline
-
-        try {
-            # Eksekusi Reset Password
-            Set-EntraUser -UserId $targetUser -PasswordProfile @{
-                Password = $autoGeneratedPassword
-                ForceChangePasswordNextSignIn = $true
-            } -ErrorAction Stop
-
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = $autoGeneratedPassword # Simpan password di log CSV
-                Status            = "SUCCESS"
-                Message           = "Password auto-generated and reset"
-            }
-        } catch {
-            $res = [PSCustomObject]@{
-                Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-                UserPrincipalName = $targetUser
-                TemporaryPassword = "-"
-                Status            = "FAILED"
-                Message           = $_.Exception.Message
-            }
-        }
-        [void]$scriptOutput.Add($res)
-    }
-    Write-Host "`n`nPemrosesan Selesai." -ForegroundColor Green
+# Ambil Data Pengguna
+if ($useAllUsers) {
+    Write-Host "Mengambil data seluruh pengguna..." -ForegroundColor Yellow
+    $targetUsers = Get-MgUser -All -Select "UserPrincipalName,Id"
 } else {
-    Write-Host "ERROR: File '$inputFileName' tidak ditemukan!" -ForegroundColor Red
+    $csvData = Import-Csv -Path $inputFilePath -Header "UserPrincipalName" | Where-Object { $_.UserPrincipalName -ne $null -and $_.UserPrincipalName.Trim() -ne "" }
+    $targetUsers = $csvData
 }
 
-## ==========================================================================
-##                              EKSPOR HASIL
-## ==========================================================================
+$totalUsers = $targetUsers.Count
+$counter = 0
 
-if ($scriptOutput.Count -gt 0) {
-    # 1. Tentukan nama folder
-    $exportFolderName = "exported_data"
+foreach ($user in $targetUsers) {
+    $counter++
+    $upn = $user.UserPrincipalName.Trim()
+    $newPassword = Generate-RandomPassword
     
-    # 2. Ambil jalur dua tingkat di atas direktori skrip
-    # Contoh: Jika skrip di C:\Users\Erik\Project\Scripts, maka ini ke C:\Users\Erik\
-    $parentDir = (Get-Item $scriptDir).Parent.Parent.FullName
-    
-    # 3. Gabungkan menjadi jalur folder ekspor
-    $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName
+    Write-Host "[$counter/$totalUsers] Memproses: $upn" -ForegroundColor Green
 
-    # 4. Cek apakah folder 'exported_data' sudah ada di lokasi tersebut, jika belum buat baru
-    if (-not (Test-Path -Path $exportFolderPath)) {
-        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null
-        Write-Host "`nFolder '$exportFolderName' berhasil dibuat di: $parentDir" -ForegroundColor Yellow
+    try {
+        # Parameter Reset Password untuk Microsoft Graph
+        $params = @{
+            passwordProfile = @{
+                forceChangePasswordNextSignIn = $true
+                password = $newPassword
+            }
+        }
+        Update-MgUser -UserId $upn -BodyParameter $params -ErrorAction Stop
+
+        $res = [PSCustomObject]@{
+            Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            UserPrincipalName = $upn
+            TemporaryPassword = $newPassword
+            Status            = "SUCCESS"
+            Message           = "Password berhasil direset"
+        }
+    } catch {
+        $res = [PSCustomObject]@{
+            Timestamp         = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+            UserPrincipalName = $upn
+            TemporaryPassword = "-"
+            Status            = "FAILED"
+            Message           = $_.Exception.Message
+        }
     }
+    [void]$scriptOutput.Add($res)
+}
 
-    # 5. Tentukan nama file dan jalur lengkap
-    $outputFileName = "Output_$($scriptName)_$($timestamp).csv"
-    $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName
-    
-    # 6. Ekspor data
-    $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8
+## ==========================================================================  
+##                               EKSPOR HASIL  
+## ==========================================================================  
+
+if ($scriptOutput.Count -gt 0) {  
+    $exportFolderName = "exported_data"  
+    $exportFolderPath = Join-Path -Path $parentDir -ChildPath $exportFolderName  
+
+    if (-not (Test-Path -Path $exportFolderPath)) {  
+        New-Item -Path $exportFolderPath -ItemType Directory | Out-Null  
+    }  
+
+    $resultsFilePath = Join-Path -Path $exportFolderPath -ChildPath $outputFileName  
+    $scriptOutput | Export-Csv -Path $resultsFilePath -NoTypeInformation -Delimiter ";" -Encoding UTF8  
     
     Write-Host "`nSemua proses selesai!" -ForegroundColor Green
-    Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan
+    Write-Host "Laporan tersimpan di: ${resultsFilePath}" -ForegroundColor Cyan  
 }
